@@ -1,0 +1,296 @@
+#!/usr/bin/env bash
+
+function main()
+{
+    source ./conf/ssl-var-configuration.sh
+    
+    parse_arguments "$@"
+    validate_arguments
+
+    if [[ ! -z $_flag_rootca ]]; then
+        push_ssl_rootca_cnf_paths
+        create_rootca
+    fi
+    if [[ ! -z $_store_intermediate_name ]]; then
+        source_intermediate_vars $_store_intermediate_name
+        push_ssl_intermediate_cnf_paths
+        create_intermediate
+        create_truststores $_store_intermediate_name
+    fi
+    if [[ ! -z $_leaf_certificate_type ]]; then
+        source_leaf_vars $_store_leaf_certificate_name $_intermediate_dir
+        create_leaf
+    fi
+}
+
+function _create_directories()
+{
+    for _dir in $1
+    do
+        [[ ! -d $_dir ]] && mkdir -p $_dir
+    done
+}
+
+function _prepare_rootca_dirs()
+{
+    _create_directories "$_root_dirs_list"
+    chmod 700 $_root_private_key_dir
+    if [[ ! -f $_root_index_file ]]; then
+        touch $_root_index_file
+        echo -e "unique_subject = yes" > ${_root_index_file}.attr
+    fi
+    [[ ! -f $_root_serial_file ]] && echo 1000 > $_root_serial_file
+}
+
+function _prepare_intermediate_dirs()
+{
+    _create_directories "$_intermediate_dirs_list"
+    chmod 700 $_intermediate_private_key_dir
+    if [[ ! -f $_intermediate_index_file ]]; then
+        touch $_intermediate_index_file
+        echo -e "unique_subject = yes" > ${_intermediate_index_file}.attr
+    fi
+    [[ ! -f $_intermediate_serial_file ]] && echo 1000 > $_intermediate_serial_file
+    [[ ! -f $_intermediate_crlnumber ]] && echo 1000 > $_intermediate_crlnumber
+}
+
+function _prepare_leaf_dirs
+{
+    _create_directories "$_leaf_dirs_list"
+    chmod 700 $_leaf_private_key_dir
+}
+
+function _generate_key()
+{
+    echo -e "Creating private key - $1"
+    openssl genrsa -aes256 -out $1 4096
+    chmod 400 $1
+}
+
+function _generate_rootca_cert()
+{
+    echo -e "\nCreating public certificate - $_root_public_cert"
+    echo -e "Using cnf file: $_root_cnf_file"
+    echo -e "Using extension: $_root_extension"
+
+    openssl req -config $ROOTCA_CNF_FILE -key $_root_private_key \
+        -new -x509 -days $_root_days_to_live -sha512 -extensions $_root_extension \
+        -out $_root_public_cert
+    chmod 444 $_root_public_cert
+}
+
+
+
+function _generate_intermediate_csr()
+{
+    echo -e "\nCreating CSR - $_intermediate_csr_file"
+    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
+    
+    openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
+        -key $_intermediate_private_key -out $_intermediate_csr_file
+}
+
+function _generate_leaf_csr
+{
+    echo -e "\nCreating CSR - $_leaf_csr_file"
+    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
+    
+    openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
+        -key $_leaf_private_key -out $_leaf_csr_file
+}
+
+function _sign_intermediate_csr
+{
+    echo -e "\nCreating signed certificate - $_intermediate_signed_cert"
+    echo -e "Using CSR: $_intermediate_csr_file"
+    echo -e "Using cnf file: $ROOTCA_CNF_FILE"
+    echo -e "Using extension: $_intermediate_extension"
+    
+    openssl ca -config $ROOTCA_CNF_FILE -extensions $_intermediate_extension \
+        -days $_intermediate_days_to_live -notext -md sha512 \
+        -in $_intermediate_csr_file -out $_intermediate_signed_cert
+    chmod 444 $_intermediate_signed_cert
+}
+
+function _sign_leaf_csr
+{
+    echo -e "\nCreating signed certificate - $_leaf_signed_cert"
+    echo -e "Using intermediate - $_store_intermediate_name"
+    echo -e "Using CSR: $_leaf_csr_file"
+    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
+    echo -e "Using extension: $_leaf_certificate_type"
+    
+    openssl ca -config $INTERMEDIATE_CNF_FILE -extensions $_leaf_certificate_type \
+        -days $_leaf_days_to_live -notext -md sha512 \
+        -in $_leaf_csr_file -out $_leaf_signed_cert
+    chmod 444 $_leaf_signed_cert
+}
+
+function _create_intermediate_chain
+{
+    cat $_intermediate_signed_cert $_root_public_cert > $_intermediate_chain
+    chmod 444 $_intermediate_chain
+}
+
+function _generate_pfx_truststore
+{
+    echo -e "\nCreating PKCS12 Truststore: $_pkcs12_truststore"
+    openssl pkcs12 -export -nokeys -out $_pkcs12_truststore -in $_intermediate_chain
+    chmod 644 $_pkcs12_truststore
+}
+
+function _generate_jks_truststore
+{
+    echo -e "\nCreating JKS Truststore: $_jks_truststore"
+    echo -e "Importing rootca - $_root_public_cert"
+    keytool -importcert -alias rootca -keystore $_jks_truststore -file $_root_public_cert
+    echo -e "Importing intermediate - $_intermediate_signed_cert"
+    keytool -importcert -alias $_store_intermediate_name \
+        -keystore $_jks_truststore -file $_intermediate_signed_cert
+    chmod 644 $_jks_truststore
+}
+
+function _print_usage()
+{
+    echo "Usage:"
+    echo "    -h                       Display this help message."
+    echo "    -l                       List all available intermediates"
+    echo "    -r                       Create the rootca key and certificate"
+    echo "    -i <intermediate_name>   Create or use intermediate with given name"
+    echo "                               - The name should be the same as the CN"
+    echo "    -s <server_cert_name>    Create a server certificate with given name"
+    echo "                               - Requires -i <intermediate_name> to sign"
+    echo "    -c <client_cert_name>    Create a client certificate with given name"
+    echo "                               - Requires -i <intermediate_name> to sign"
+    echo "    -e <IP:ip,DNS:host,...>  SAN list to be used for server or client certificate"
+    echo "                               - Requires -s <server_cert_name> or -c <client_cert_name>"
+}
+
+function _print_intermediates()
+{
+    if [[ -f $_root_index_file ]]; then
+        local _available_intermediates=$(egrep "^V" $_root_index_file \
+            | awk '{print $NF}' \
+            | awk -F "/" '{s=$NF;for(i=NF-1;i>=1;i--)s=s "," $i; print "\t",s}')
+    fi
+    [[ ! -z $_available_intermediates ]] \
+        && echo -e "All available intermediates:\n$_available_intermediates" \
+        || echo -e "No intermediates have been generated"
+}
+
+function _print_leaves()
+{
+    echo "TODO"
+}
+
+function __hidden_cleanup()
+{
+    rm -rf $ROOTCA_DIR
+}
+
+function parse_arguments()
+{
+    if [ $# -lt 1 ]; then
+        echo -e "No arguments were passed\n"
+        _print_usage
+    fi
+    while getopts ":hlri:c:s:e:z" _opt; do
+        case $_opt in
+            h )
+                _print_usage
+                exit 0
+                ;;
+            l )
+                _print_intermediates
+                exit 0
+                ;;
+            r)
+                _flag_rootca=true
+                ;;
+            i)
+                _store_intermediate_name="$OPTARG"
+                ;;
+            s)
+                _store_leaf_certificate_name="$OPTARG"
+                _leaf_certificate_type="server_cert"
+                _flag_server_certificate=true
+                ;;
+            c)
+                _store_leaf_certificate_name="$OPTARG"
+                _leaf_certificate_type="usr_cert"
+                _flag_client_certificate=true
+                ;;
+            e)
+                _store_san_extensions="$OPTARG"
+                ;;
+            z)
+                __hidden_cleanup
+                ;;
+            \?)
+                echo -e "Invalid option: -$OPTARG\n"
+                _print_usage
+                exit 1
+                ;;
+            :)
+                echo -e "Option -$OPTARG requires an argument.\n"
+                _print_usage
+                exit 1
+                ;;
+        esac
+    done
+}
+
+function validate_arguments()
+{
+    if [[ ! -z $_flag_server_certificate && ! -z $_flag_client_certificate ]]; then
+        echo -e "Option -c and -s cannot both be supplied.\n"
+        _print_usage
+        exit 1
+    elif [[ ! -z $_leaf_certificate_type && -z $_store_intermediate_name ]]; then
+        echo -e "An intermediate must be passed with -i to sign the certificate.\n"
+        _print_usage
+        exit 1
+    elif [[ ! -z $_store_san_extensions && -z $_leaf_certificate_type ]]; then
+        echo -e "Option -e can only be used with -c or -s.\n"
+        _print_usage
+        exit 1
+    elif [[ $_store_intermediate_name == *\.* ]];then
+        echo -e "Intermediate name cannot contain a period (.)\n"
+        exit 1
+    fi
+}
+
+function create_rootca()
+{
+    _prepare_rootca_dirs
+
+    [[ ! -f $_root_private_key ]] && _generate_key $_root_private_key
+    [[ ! -f $_root_public_cert ]] && _generate_rootca_cert 
+}
+
+function create_intermediate()
+{
+    _prepare_intermediate_dirs
+
+    [[ ! -f $_intermediate_private_key ]] && _generate_key $_intermediate_private_key
+    [[ ! -f $_intermediate_csr_file ]] && _generate_intermediate_csr
+    [[ ! -f $_intermediate_signed_cert ]] && _sign_intermediate_csr
+    [[ ! -f $_intermediate_chain ]] && _create_intermediate_chain
+}
+
+function create_leaf()
+{
+    _prepare_leaf_dirs
+
+    [[ ! -f $_leaf_private_key ]] && _generate_key $_leaf_private_key
+    [[ ! -f $_leaf_csr_file ]] && _generate_leaf_csr
+    [[ ! -f $_leaf_signed_cert ]] && _sign_leaf_csr
+}
+
+function create_truststores()
+{    
+    [[ ! -f $_pkcs12_truststore ]] && _generate_pfx_truststore
+    [[ ! -f $_jks_truststore ]] && _generate_jks_truststore
+}
+
+main "$@"
