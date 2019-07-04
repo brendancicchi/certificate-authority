@@ -6,7 +6,12 @@ function main()
     
     parse_arguments "$@"
     validate_arguments
-
+    if [[ ! -z $_flag_list_certs ]]; then
+        [[ -z $_store_intermediate_name ]] && print_intermediates \
+            || (source_intermediate_vars $_store_intermediate_name \
+            && print_leaves)
+        exit 0
+    fi
     if [[ ! -z $_flag_rootca ]]; then
         push_ssl_rootca_cnf_paths
         create_rootca
@@ -188,7 +193,8 @@ function _print_usage()
 {
     echo "Usage:"
     echo "    -h                       Display this help message."
-    echo "    -l                       List all available intermediates"
+    echo "    -l                       List created intermediates"
+    echo "                               - Use with -i <intermediate> to show leaf certificates"
     echo "    -r                       Create the rootca key and certificate"
     echo "    -i <intermediate_name>   Create or use intermediate with given name"
     echo "                               - The name should be the same as the CN"
@@ -198,23 +204,6 @@ function _print_usage()
     echo "                               - Requires -i <intermediate_name> to sign"
     echo "    -e <IP:ip,DNS:host,...>  SAN list to be used for server or client certificate"
     echo "                               - Requires -s <server_cert_name> or -c <client_cert_name>"
-}
-
-function _print_intermediates()
-{
-    if [[ -f $_root_index_file ]]; then
-        local _available_intermediates=$(egrep "^V" $_root_index_file \
-            | awk '{print $NF}' \
-            | awk -F "/" '{s=$NF;for(i=NF-1;i>=1;i--)s=s "," $i; print "\t",s}')
-    fi
-    [[ ! -z $_available_intermediates ]] \
-        && echo -e "All available intermediates:\n$_available_intermediates" \
-        || echo -e "No intermediates have been generated"
-}
-
-function _print_leaves()
-{
-    echo "TODO"
 }
 
 function __hidden_cleanup()
@@ -235,8 +224,7 @@ function parse_arguments()
                 exit 0
                 ;;
             l )
-                _print_intermediates
-                exit 0
+                _flag_list_certs=true
                 ;;
             r)
                 _flag_rootca=true
@@ -292,6 +280,30 @@ function validate_arguments()
         echo -e "Intermediate name cannot contain a period (.)\n"
         exit 1
     fi
+}
+
+function print_intermediates()
+{
+    if [[ -f $_root_index_file ]]; then
+        local _current_intermediates=$(egrep "^V" $_root_index_file \
+            | awk '{print $NF}' \
+            | awk -F "/" '{s=$NF;for(i=NF-1;i>=1;i--)s=s "," $i; print "\t",s}')
+    fi
+    [[ ! -z $_current_intermediates ]] \
+        && echo -e "All current intermediates:\n$_current_intermediates" \
+        || echo -e "No intermediates have been generated"
+}
+
+function print_leaves()
+{
+    if [[ -f $_intermediate_index_file ]]; then
+        local _current_leaves=$(egrep "^V" $_intermediate_index_file \
+            | awk '{print $NF}' \
+            | awk -F "/" '{s=$NF;for(i=NF-1;i>=1;i--)s=s "," $i; print "\t",s}')
+    fi
+    [[ ! -z $_current_leaves ]] \
+        && echo -e "All current leaf certificates for intermediate $_store_intermediate_name:\n$_current_leaves" \
+        || echo -e "No leaf certificates have been generated for $_store_intermediate_name"
 }
 
 function create_rootca()

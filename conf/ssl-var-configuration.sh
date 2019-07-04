@@ -24,6 +24,7 @@ PKCS12_STORES_PATH=$ROOTCA_DIR/stores
 # The below section should not be touched by the typical user
 ##### END DISCLAIMER ######
 
+_flag_list_certs=
 _flag_rootca=
 _store_intermediate_name=
 _store_leaf_certificate_name=
