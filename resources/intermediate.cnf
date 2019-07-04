@@ -82,6 +82,7 @@ stateOrProvinceName_default     = CA
 localityName_default            =
 0.organizationName_default      = DataStax
 organizationalUnitName_default  = Support
+commonName_default              = 
 emailAddress_default            =
 
 [ v3_ca ]

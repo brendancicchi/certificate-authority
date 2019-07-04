@@ -13,10 +13,10 @@ ROOTCA_CNF_FILE=$SSL_DIR/cnf_files/rootca.cnf
 INTERMEDIATE_CNF_FILE=$SSL_DIR/cnf_files/intermediate.cnf
 
 # JKS format truststore with certificate chain location
-JKS_TRUSTSTORE_PATH=$ROOTCA_DIR/stores
+JKS_STORES_PATH=$ROOTCA_DIR/stores
 
 # PKCS12 format truststore with certificate chain location
-PKCS12_TRUSTSTORE_PATH=$ROOTCA_DIR/stores
+PKCS12_STORES_PATH=$ROOTCA_DIR/stores
 
 ##### End of Common Configurations #####
 
@@ -71,16 +71,16 @@ function source_intermediate_vars()
     _intermediate_extension="v3_intermediate_ca"
     _intermediate_days_to_live="3650"
     _intermediate_chain="$_intermediate_public_certs_dir/ca-$1-chain.certs.pem"
-    _jks_truststore="$JKS_TRUSTSTORE_PATH/$1-truststore.jks"
-    _pkcs12_truststore="$PKCS12_TRUSTSTORE_PATH/$1-truststore.pfx"
+    _jks_truststore="$JKS_STORES_PATH/$1-truststore.jks"
+    _pkcs12_truststore="$PKCS12_STORES_PATH/$1-truststore.pfx"
 
     _intermediate_dirs_list="$_intermediate_private_key_dir
         $_intermediate_public_certs_dir
         $_intermediate_csr_dir
         $_intermediate_crl_dir
         $_intermediate_new_certs_dir
-        $JKS_TRUSTSTORE_PATH
-        $PKCS12_TRUSTSTORE_PATH"
+        $JKS_STORES_PATH
+        $PKCS12_STORES_PATH"
 }
 
 function source_leaf_vars() {
@@ -92,6 +92,8 @@ function source_leaf_vars() {
     _leaf_public_certs_dir="$_leaf_dir/certs"
     _leaf_signed_cert="$_leaf_public_certs_dir/$1.cert.pem"
     _leaf_days_to_live="365"
+    _pkcs12_keystore="$PKCS12_STORES_PATH/$1-keystore.pfx"
+    _jks_keystore="$JKS_STORES_PATH/$1-keystore.jks"
     _leaf_dirs_list="$_leaf_private_key_dir
         $_leaf_csr_dir
         $_leaf_public_certs_dir"

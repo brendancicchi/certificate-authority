@@ -2,7 +2,7 @@
 
 function main()
 {
-    source ./conf/ssl-var-configuration.sh
+    source $(dirname ${BASH_SOURCE[0]})/conf/ssl-var-configuration.sh
     
     parse_arguments "$@"
     validate_arguments
@@ -20,6 +20,7 @@ function main()
     if [[ ! -z $_leaf_certificate_type ]]; then
         source_leaf_vars $_store_leaf_certificate_name $_intermediate_dir
         create_leaf
+        create_keystores
     fi
 }
 
@@ -60,6 +61,17 @@ function _prepare_leaf_dirs
     chmod 700 $_leaf_private_key_dir
 }
 
+function _append_san_to_cnf
+{
+    echo -e "[SAN]\nsubjectAltName = $_store_san_extensions" >> $INTERMEDIATE_CNF_FILE
+}
+
+function _remove_san_from_cnf
+{
+    sed -i .orig '$d' $INTERMEDIATE_CNF_FILE
+    sed -i .orig '$d' $INTERMEDIATE_CNF_FILE
+}
+
 function _generate_key()
 {
     echo -e "Creating private key - $1"
@@ -79,12 +91,12 @@ function _generate_rootca_cert()
     chmod 444 $_root_public_cert
 }
 
-
-
 function _generate_intermediate_csr()
 {
     echo -e "\nCreating CSR - $_intermediate_csr_file"
     echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
+
+    sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_intermediate_name," $INTERMEDIATE_CNF_FILE
     
     openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
         -key $_intermediate_private_key -out $_intermediate_csr_file
@@ -94,9 +106,16 @@ function _generate_leaf_csr
 {
     echo -e "\nCreating CSR - $_leaf_csr_file"
     echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
-    
+
+    _append_san_to_cnf
+    [[ ! -z $_store_san_extensions ]] && _request_san_extension="-reqexts SAN"
+    sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_leaf_certificate_name," $INTERMEDIATE_CNF_FILE
+
     openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
-        -key $_leaf_private_key -out $_leaf_csr_file
+        -key $_leaf_private_key -out $_leaf_csr_file \
+        $_request_san_extension
+        
+    _remove_san_from_cnf
 }
 
 function _sign_intermediate_csr
@@ -105,7 +124,7 @@ function _sign_intermediate_csr
     echo -e "Using CSR: $_intermediate_csr_file"
     echo -e "Using cnf file: $ROOTCA_CNF_FILE"
     echo -e "Using extension: $_intermediate_extension"
-    
+
     openssl ca -config $ROOTCA_CNF_FILE -extensions $_intermediate_extension \
         -days $_intermediate_days_to_live -notext -md sha512 \
         -in $_intermediate_csr_file -out $_intermediate_signed_cert
@@ -139,6 +158,14 @@ function _generate_pfx_truststore
     chmod 644 $_pkcs12_truststore
 }
 
+function _generate_pfx_keystore
+{
+    echo -e "\nCreating PKCS12 Keystore: $_pkcs12_keystore"
+    openssl pkcs12 -export -inkey $_leaf_private_key -in $_leaf_signed_cert \
+        -certfile $_intermediate_chain -out $_pkcs12_keystore
+    chmod 400 $_pkcs12_keystore
+}
+
 function _generate_jks_truststore
 {
     echo -e "\nCreating JKS Truststore: $_jks_truststore"
@@ -148,6 +175,13 @@ function _generate_jks_truststore
     keytool -importcert -alias $_store_intermediate_name \
         -keystore $_jks_truststore -file $_intermediate_signed_cert
     chmod 644 $_jks_truststore
+}
+
+function _generate_jks_keystore
+{
+    echo -e "\nCreating JKS Keystore: $_jks_keystore"
+    keytool -importkeystore -srckeystore $_pkcs12_keystore -srcstoretype PKCS12 \
+        -destkeystore $_jks_keystore -deststoretype JKS
 }
 
 function _print_usage()
@@ -291,6 +325,12 @@ function create_truststores()
 {    
     [[ ! -f $_pkcs12_truststore ]] && _generate_pfx_truststore
     [[ ! -f $_jks_truststore ]] && _generate_jks_truststore
+}
+
+function create_keystores()
+{
+    [[ ! -f $_pkcs12_keystore ]] && _generate_pfx_keystore
+    [[ ! -f $_jks_keystore ]] && _generate_jks_keystore
 }
 
 main "$@"
