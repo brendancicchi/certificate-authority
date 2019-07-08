@@ -217,18 +217,13 @@ function _print_usage()
     echo "                               - Otherwise assumes intermediate certificate"
 }
 
-function __hidden_cleanup()
-{
-    rm -rf $ROOTCA_DIR
-}
-
 function parse_arguments()
 {
     if [ $# -lt 1 ]; then
         echo -e "No arguments were passed\n"
         _print_usage
     fi
-    while getopts ":hlri:c:s:e:x:z" _opt; do
+    while getopts ":hlri:c:s:e:x:" _opt; do
         case $_opt in
             h )
                 _print_usage
@@ -258,9 +253,6 @@ function parse_arguments()
                 ;;
             x)
                 _store_revoke_name="$OPTARG"
-                ;;
-            z)
-                __hidden_cleanup
                 ;;
             \?)
                 echo -e "Invalid option: -$OPTARG\n"
