@@ -2,23 +2,30 @@
 
 function main()
 {
-    source $(dirname ${BASH_SOURCE[0]})/conf/ssl-var-configuration.sh
-    
+    source $(dirname ${BASH_SOURCE[0]})/conf/ssl-var-configuration.sh   
     parse_arguments "$@"
     validate_arguments
+
+    [[ ! -z $_store_intermediate_name ]] && source_intermediate_vars $_store_intermediate_name
+
     if [[ ! -z $_flag_list_certs ]]; then
-        [[ -z $_store_intermediate_name ]] && print_intermediates \
-            || (source_intermediate_vars $_store_intermediate_name \
-            && print_leaves)
+        [[ ! -z $_store_intermediate_name ]] && print_leaves || print_intermediates
+        exit 0
+    fi
+    if [[ ! -z $_store_revoke_name ]]; then
+        if [[ ! -z $_store_intermediate_name ]]; then
+            source_leaf_vars $_store_revoke_name $_intermediate_dir
+            revoke_leaf
+        else
+            source_intermediate_vars $_store_revoke_name
+            revoke_intermediate
+        fi
         exit 0
     fi
     if [[ ! -z $_flag_rootca ]]; then
-        push_ssl_rootca_cnf_paths
         create_rootca
     fi
     if [[ ! -z $_store_intermediate_name ]]; then
-        source_intermediate_vars $_store_intermediate_name
-        push_ssl_intermediate_cnf_paths
         create_intermediate
         create_truststores $_store_intermediate_name
     fi
@@ -27,6 +34,20 @@ function main()
         create_leaf
         create_keystores
     fi
+}
+
+function _cleanup_intermediate_files
+{
+    [[ -d $_intermediate_dir ]] && rm -r $_intermediate_dir
+    [[ -f $_pkcs12_truststore ]] && rm $_pkcs12_truststore
+    [[ -f $_jks_truststore ]] && rm $_jks_truststore
+}
+
+function _cleanup_leaf_files
+{
+    [[ -d $_leaf_dir ]] && rm -r $_leaf_dir
+    [[ -f $_pkcs12_keystore ]] && rm $_pkcs12_keystore
+    [[ -f $_jks_keystore ]] && rm $_jks_keystore
 }
 
 function _create_directories()
@@ -204,6 +225,9 @@ function _print_usage()
     echo "                               - Requires -i <intermediate_name> to sign"
     echo "    -e <IP:ip,DNS:host,...>  SAN list to be used for server or client certificate"
     echo "                               - Requires -s <server_cert_name> or -c <client_cert_name>"
+    echo "    -x <certificate_name>    Revoke the named certificate"
+    echo "                               - Use with -i <intermediate> to specify a leaf certificate"
+    echo "                               - Otherwise assumes intermediate certificate"
 }
 
 function __hidden_cleanup()
@@ -217,7 +241,7 @@ function parse_arguments()
         echo -e "No arguments were passed\n"
         _print_usage
     fi
-    while getopts ":hlri:c:s:e:z" _opt; do
+    while getopts ":hlri:c:s:e:x:z" _opt; do
         case $_opt in
             h )
                 _print_usage
@@ -244,6 +268,9 @@ function parse_arguments()
                 ;;
             e)
                 _store_san_extensions="$OPTARG"
+                ;;
+            x)
+                _store_revoke_name="$OPTARG"
                 ;;
             z)
                 __hidden_cleanup
@@ -304,6 +331,30 @@ function print_leaves()
     [[ ! -z $_current_leaves ]] \
         && echo -e "All current leaf certificates for intermediate $_store_intermediate_name:\n$_current_leaves" \
         || echo -e "No leaf certificates have been generated for $_store_intermediate_name"
+}
+
+function revoke_intermediate()
+{
+    if [[ -f $_root_index_file ]]; then
+        local _intermediate_id=$(egrep "^V" $_root_index_file \
+            | grep "$_store_revoke_name" | cut -f4)
+        local _cert_to_revoke="${_root_new_certs_dir}/${_intermediate_id}.pem"
+        echo "$_cert_to_revoke"
+        openssl ca -revoke $_cert_to_revoke -config $ROOTCA_CNF_FILE
+    fi
+    _cleanup_intermediate_files
+}
+
+function revoke_leaf()
+{
+    if [[ -f $_intermediate_index_file ]]; then
+        local _leaf_id=$(egrep "^V" $_intermediate_index_file \
+            | grep "$_store_revoke_name" | cut -f4)
+        local _cert_to_revoke="${_intermediate_new_certs_dir}/${_leaf_id}.pem"
+        echo "$_cert_to_revoke"
+        openssl ca -revoke $_cert_to_revoke -config $INTERMEDIATE_CNF_FILE
+    fi
+    _cleanup_leaf_files
 }
 
 function create_rootca()

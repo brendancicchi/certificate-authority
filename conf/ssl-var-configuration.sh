@@ -32,6 +32,7 @@ _flag_server_certificate=
 _flag_client_certificate=
 _leaf_certificate_type=
 _store_san_extensions=
+_store_revoke_name=
 
 _root_private_key_dir="$ROOTCA_DIR/private"
 _root_private_key="$_root_private_key_dir/ca.key.pem"
@@ -82,6 +83,8 @@ function source_intermediate_vars()
         $_intermediate_new_certs_dir
         $JKS_STORES_PATH
         $PKCS12_STORES_PATH"
+
+    push_ssl_intermediate_cnf_paths
 }
 
 function source_leaf_vars() {
@@ -93,8 +96,8 @@ function source_leaf_vars() {
     _leaf_public_certs_dir="$_leaf_dir/certs"
     _leaf_signed_cert="$_leaf_public_certs_dir/$1.cert.pem"
     _leaf_days_to_live="365"
-    _pkcs12_keystore="$PKCS12_STORES_PATH/$1-keystore.pfx"
-    _jks_keystore="$JKS_STORES_PATH/$1-keystore.jks"
+    _pkcs12_keystore="$PKCS12_STORES_PATH/$1-$2-keystore.pfx"
+    _jks_keystore="$JKS_STORES_PATH/$1-$2-keystore.jks"
     _leaf_dirs_list="$_leaf_private_key_dir
         $_leaf_csr_dir
         $_leaf_public_certs_dir"
@@ -131,3 +134,5 @@ function push_ssl_intermediate_cnf_paths()
         -e "s,\(crl *=\).*,\1 $_intermediate_crl," \
         $INTERMEDIATE_CNF_FILE
 }
+
+push_ssl_rootca_cnf_paths
