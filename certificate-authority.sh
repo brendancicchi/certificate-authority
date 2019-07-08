@@ -87,17 +87,6 @@ function _prepare_leaf_dirs
     chmod 700 $_leaf_private_key_dir
 }
 
-function _append_san_to_cnf
-{
-    echo -e "[SAN]\nsubjectAltName = $_store_san_extensions" >> $INTERMEDIATE_CNF_FILE
-}
-
-function _remove_san_from_cnf
-{
-    sed -i .orig '$d' $INTERMEDIATE_CNF_FILE
-    sed -i .orig '$d' $INTERMEDIATE_CNF_FILE
-}
-
 function _generate_key()
 {
     echo -e "Creating private key - $1"
@@ -133,15 +122,13 @@ function _generate_leaf_csr
     echo -e "\nCreating CSR - $_leaf_csr_file"
     echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
 
-    _append_san_to_cnf
+    sed -i .orig -e "s%\(^subjectAltName *=\).*%\1 $_store_san_extensions%" $INTERMEDIATE_CNF_FILE
     [[ ! -z $_store_san_extensions ]] && _request_san_extension="-reqexts SAN"
     sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_leaf_certificate_name," $INTERMEDIATE_CNF_FILE
 
     openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
         -key $_leaf_private_key -out $_leaf_csr_file \
         $_request_san_extension
-        
-    _remove_san_from_cnf
 }
 
 function _sign_intermediate_csr

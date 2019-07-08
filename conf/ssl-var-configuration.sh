@@ -96,8 +96,8 @@ function source_leaf_vars() {
     _leaf_public_certs_dir="$_leaf_dir/certs"
     _leaf_signed_cert="$_leaf_public_certs_dir/$1.cert.pem"
     _leaf_days_to_live="365"
-    _pkcs12_keystore="$PKCS12_STORES_PATH/$1-$2-keystore.pfx"
-    _jks_keystore="$JKS_STORES_PATH/$1-$2-keystore.jks"
+    _pkcs12_keystore="$PKCS12_STORES_PATH/$1-keystore.pfx"
+    _jks_keystore="$JKS_STORES_PATH/$1-keystore.jks"
     _leaf_dirs_list="$_leaf_private_key_dir
         $_leaf_csr_dir
         $_leaf_public_certs_dir"
