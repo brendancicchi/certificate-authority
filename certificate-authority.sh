@@ -4,7 +4,10 @@ function main()
 {
     source $(dirname ${BASH_SOURCE[0]})/conf/ssl-var-configuration.sh   
     parse_arguments "$@"
-    validate_arguments
+    if ! validate_arguments; then
+        _print_usage
+        exit 1
+    fi
 
     [[ ! -z $_store_intermediate_name ]] && source_intermediate_vars $_store_intermediate_name
 
@@ -34,6 +37,7 @@ function main()
         create_leaf
         create_keystores
     fi
+    [[ ! -z $_store_zip_name ]] && zip_certificates
 }
 
 function _cleanup_intermediate_files
@@ -215,6 +219,9 @@ function _print_usage()
     echo "    -x <certificate_name>    Revoke the named certificate"
     echo "                               - Use with -i <intermediate> to specify a leaf certificate"
     echo "                               - Otherwise assumes intermediate certificate"
+    echo "    -z <zip_name>            Zip up the relevant certificates, keys, and stores"
+    echo "                               - Use with -i <intermediate> to only zip the public chain and stores"
+    echo "                               - Use with -c or -s to include the keys and keystores"
 }
 
 function parse_arguments()
@@ -223,7 +230,7 @@ function parse_arguments()
         echo -e "No arguments were passed\n"
         _print_usage
     fi
-    while getopts ":hlri:c:s:e:x:" _opt; do
+    while getopts ":hlri:c:s:e:x:z:" _opt; do
         case $_opt in
             h )
                 _print_usage
@@ -236,23 +243,32 @@ function parse_arguments()
                 _flag_rootca=true
                 ;;
             i)
+                _validate_optarg $OPTARG
                 _store_intermediate_name="$OPTARG"
                 ;;
             s)
+                _validate_optarg $OPTARG
                 _store_leaf_certificate_name="$OPTARG"
                 _leaf_certificate_type="server_cert"
                 _flag_server_certificate=true
                 ;;
             c)
+                _validate_optarg $OPTARG
                 _store_leaf_certificate_name="$OPTARG"
                 _leaf_certificate_type="usr_cert"
                 _flag_client_certificate=true
                 ;;
             e)
+                _validate_optarg $OPTARG
                 _store_san_extensions="$OPTARG"
                 ;;
             x)
+                _validate_optarg $OPTARG
                 _store_revoke_name="$OPTARG"
+                ;;
+            z)
+                _validate_optarg $OPTARG
+                _store_zip_name="$OPTARG.tar"
                 ;;
             \?)
                 echo -e "Invalid option: -$OPTARG\n"
@@ -268,24 +284,33 @@ function parse_arguments()
     done
 }
 
+function _validate_optarg
+{
+    if [[ $1 == -* ]];then
+        echo -e "Missing an argument\n"
+        exit 1
+    fi
+}
+
 function validate_arguments()
 {
     if [[ ! -z $_flag_server_certificate && ! -z $_flag_client_certificate ]]; then
         echo -e "Option -c and -s cannot both be supplied.\n"
-        _print_usage
-        exit 1
+        return 1
     elif [[ ! -z $_leaf_certificate_type && -z $_store_intermediate_name ]]; then
         echo -e "An intermediate must be passed with -i to sign the certificate.\n"
-        _print_usage
-        exit 1
+        return 1
     elif [[ ! -z $_store_san_extensions && -z $_leaf_certificate_type ]]; then
         echo -e "Option -e can only be used with -c or -s.\n"
-        _print_usage
-        exit 1
+        return 1
+    elif [[ ! -z $_store_zip_name && -z $_store_intermediate_name ]]; then
+        echo -e "An intermediate must be specified with -i <intermediate_name>.\n"
+        return 1
     elif [[ $_store_intermediate_name == *\.* ]];then
         echo -e "Intermediate name cannot contain a period (.)\n"
-        exit 1
+        return 1
     fi
+    return 0
 }
 
 function print_intermediates()
@@ -373,6 +398,36 @@ function create_keystores()
 {
     [[ ! -f $_pkcs12_keystore ]] && _generate_pfx_keystore
     [[ ! -f $_jks_keystore ]] && _generate_jks_keystore
+}
+
+function zip_certificates
+{
+    [[ ! -z $_store_intermediate_name ]] && _tar_truststores
+    [[ ! -z $_store_leaf_certificate_name ]] && _tar_keystores
+
+    gzip $_store_zip_name
+}
+
+function _tar_truststores
+{
+    [[ -f $_intermediate_chain ]] && tar -cPf $_store_zip_name \
+        -C $(dirname $_intermediate_chain) $_intermediate_chain
+    [[ -f $_pkcs12_truststore ]] && tar -rPf $_store_zip_name \
+        -C $(dirname $_pkcs12_truststore) $_pkcs12_truststore
+    [[ -f $_jks_truststore ]] && tar -rPf $_store_zip_name \
+        -C $(dirname $_jks_truststore) $_jks_truststore
+}
+
+function _tar_keystores
+{
+    [[ -f $_leaf_private_key ]] && tar -rPf $_store_zip_name \
+        -C $(dirname $_leaf_private_key) $_leaf_private_key
+    [[ -f $_leaf_signed_cert ]] && tar -rPf $_store_zip_name \
+        -C $(dirname $_leaf_signed_cert) $_leaf_signed_cert
+    [[ -f $_pkcs12_keystore ]] && tar -rPf $_store_zip_name \
+        -C $(dirname $_pkcs12_keystore) $_pkcs12_keystore
+    [[ -f $_jks_keystore ]] && tar -rPf $_store_zip_name \
+        -C $(dirname $_jks_keystore) $_jks_keystore
 }
 
 main "$@"
