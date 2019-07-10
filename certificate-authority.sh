@@ -40,190 +40,6 @@ function main()
     [[ ! -z $_store_zip_name ]] && zip_certificates
 }
 
-function _cleanup_intermediate_files
-{
-    [[ -d $_intermediate_dir ]] && rm -r $_intermediate_dir
-    [[ -f $_pkcs12_truststore ]] && rm $_pkcs12_truststore
-    [[ -f $_jks_truststore ]] && rm $_jks_truststore
-}
-
-function _cleanup_leaf_files
-{
-    [[ -d $_leaf_dir ]] && rm -r $_leaf_dir
-    [[ -f $_pkcs12_keystore ]] && rm $_pkcs12_keystore
-    [[ -f $_jks_keystore ]] && rm $_jks_keystore
-}
-
-function _create_directories()
-{
-    for _dir in $1
-    do
-        [[ ! -d $_dir ]] && mkdir -p $_dir
-    done
-}
-
-function _prepare_rootca_dirs()
-{
-    _create_directories "$_root_dirs_list"
-    chmod 700 $_root_private_key_dir
-    if [[ ! -f $_root_index_file ]]; then
-        touch $_root_index_file
-        echo -e "unique_subject = yes" > ${_root_index_file}.attr
-    fi
-    [[ ! -f $_root_serial_file ]] && echo 1000 > $_root_serial_file
-}
-
-function _prepare_intermediate_dirs()
-{
-    _create_directories "$_intermediate_dirs_list"
-    chmod 700 $_intermediate_private_key_dir
-    if [[ ! -f $_intermediate_index_file ]]; then
-        touch $_intermediate_index_file
-        echo -e "unique_subject = yes" > ${_intermediate_index_file}.attr
-    fi
-    [[ ! -f $_intermediate_serial_file ]] && echo 1000 > $_intermediate_serial_file
-    [[ ! -f $_intermediate_crlnumber ]] && echo 1000 > $_intermediate_crlnumber
-}
-
-function _prepare_leaf_dirs
-{
-    _create_directories "$_leaf_dirs_list"
-    chmod 700 $_leaf_private_key_dir
-}
-
-function _generate_key()
-{
-    echo -e "Creating private key - $1"
-    openssl genrsa -aes256 -out $1 4096
-    chmod 400 $1
-}
-
-function _generate_rootca_cert()
-{
-    echo -e "\nCreating public certificate - $_root_public_cert"
-    echo -e "Using cnf file: $_root_cnf_file"
-    echo -e "Using extension: $_root_extension"
-
-    openssl req -config $ROOTCA_CNF_FILE -key $_root_private_key \
-        -new -x509 -days $_root_days_to_live -sha512 -extensions $_root_extension \
-        -out $_root_public_cert
-    chmod 444 $_root_public_cert
-}
-
-function _generate_intermediate_csr()
-{
-    echo -e "\nCreating CSR - $_intermediate_csr_file"
-    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
-
-    sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_intermediate_name," $INTERMEDIATE_CNF_FILE
-    
-    openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
-        -key $_intermediate_private_key -out $_intermediate_csr_file
-}
-
-function _generate_leaf_csr
-{
-    echo -e "\nCreating CSR - $_leaf_csr_file"
-    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
-
-    sed -i .orig -e "s%\(^subjectAltName *=\).*%\1 $_store_san_extensions%" $INTERMEDIATE_CNF_FILE
-    [[ ! -z $_store_san_extensions ]] && _request_san_extension="-reqexts SAN"
-    sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_leaf_certificate_name," $INTERMEDIATE_CNF_FILE
-
-    openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
-        -key $_leaf_private_key -out $_leaf_csr_file \
-        $_request_san_extension
-}
-
-function _sign_intermediate_csr
-{
-    echo -e "\nCreating signed certificate - $_intermediate_signed_cert"
-    echo -e "Using CSR: $_intermediate_csr_file"
-    echo -e "Using cnf file: $ROOTCA_CNF_FILE"
-    echo -e "Using extension: $_intermediate_extension"
-
-    openssl ca -config $ROOTCA_CNF_FILE -extensions $_intermediate_extension \
-        -days $_intermediate_days_to_live -notext -md sha512 \
-        -in $_intermediate_csr_file -out $_intermediate_signed_cert
-    chmod 444 $_intermediate_signed_cert
-}
-
-function _sign_leaf_csr
-{
-    echo -e "\nCreating signed certificate - $_leaf_signed_cert"
-    echo -e "Using intermediate - $_store_intermediate_name"
-    echo -e "Using CSR: $_leaf_csr_file"
-    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
-    echo -e "Using extension: $_leaf_certificate_type"
-    
-    openssl ca -config $INTERMEDIATE_CNF_FILE -extensions $_leaf_certificate_type \
-        -days $_leaf_days_to_live -notext -md sha512 \
-        -in $_leaf_csr_file -out $_leaf_signed_cert
-    chmod 444 $_leaf_signed_cert
-}
-
-function _create_intermediate_chain
-{
-    cat $_intermediate_signed_cert $_root_public_cert > $_intermediate_chain
-    chmod 444 $_intermediate_chain
-}
-
-function _generate_pfx_truststore
-{
-    echo -e "\nCreating PKCS12 Truststore: $_pkcs12_truststore"
-    openssl pkcs12 -export -nokeys -out $_pkcs12_truststore -in $_intermediate_chain
-    chmod 644 $_pkcs12_truststore
-}
-
-function _generate_pfx_keystore
-{
-    echo -e "\nCreating PKCS12 Keystore: $_pkcs12_keystore"
-    openssl pkcs12 -export -inkey $_leaf_private_key -in $_leaf_signed_cert \
-        -certfile $_intermediate_chain -out $_pkcs12_keystore
-    chmod 400 $_pkcs12_keystore
-}
-
-function _generate_jks_truststore
-{
-    echo -e "\nCreating JKS Truststore: $_jks_truststore"
-    echo -e "Importing rootca - $_root_public_cert"
-    keytool -importcert -alias rootca -keystore $_jks_truststore -file $_root_public_cert
-    echo -e "Importing intermediate - $_intermediate_signed_cert"
-    keytool -importcert -alias $_store_intermediate_name \
-        -keystore $_jks_truststore -file $_intermediate_signed_cert
-    chmod 644 $_jks_truststore
-}
-
-function _generate_jks_keystore
-{
-    echo -e "\nCreating JKS Keystore: $_jks_keystore"
-    keytool -importkeystore -srckeystore $_pkcs12_keystore -srcstoretype PKCS12 \
-        -destkeystore $_jks_keystore -deststoretype JKS
-}
-
-function _print_usage()
-{
-    echo "Usage:"
-    echo "    -h                       Display this help message."
-    echo "    -l                       List created intermediates"
-    echo "                               - Use with -i <intermediate> to show leaf certificates"
-    echo "    -r                       Create the rootca key and certificate"
-    echo "    -i <intermediate_name>   Create or use intermediate with given name"
-    echo "                               - The name should be the same as the CN"
-    echo "    -s <server_cert_name>    Create a server certificate with given name"
-    echo "                               - Requires -i <intermediate_name> to sign"
-    echo "    -c <client_cert_name>    Create a client certificate with given name"
-    echo "                               - Requires -i <intermediate_name> to sign"
-    echo "    -e <IP:ip,DNS:host,...>  SAN list to be used for server or client certificate"
-    echo "                               - Requires -s <server_cert_name> or -c <client_cert_name>"
-    echo "    -x <certificate_name>    Revoke the named certificate"
-    echo "                               - Use with -i <intermediate> to specify a leaf certificate"
-    echo "                               - Otherwise assumes intermediate certificate"
-    echo "    -z <zip_name>            Zip up the relevant certificates, keys, and stores"
-    echo "                               - Use with -i <intermediate> to only zip the public chain and stores"
-    echo "                               - Use with -c or -s to include the keys and keystores"
-}
-
 function parse_arguments()
 {
     if [ $# -lt 1 ]; then
@@ -284,6 +100,29 @@ function parse_arguments()
     done
 }
 
+function _print_usage()
+{
+    echo "Usage:"
+    echo "    -h                       Display this help message."
+    echo "    -l                       List created intermediates"
+    echo "                               - Use with -i <intermediate> to show leaf certificates"
+    echo "    -r                       Create the rootca key and certificate"
+    echo "    -i <intermediate_name>   Create or use intermediate with given name"
+    echo "                               - The name should be the same as the CN"
+    echo "    -s <server_cert_name>    Create a server certificate with given name"
+    echo "                               - Requires -i <intermediate_name> to sign"
+    echo "    -c <client_cert_name>    Create a client certificate with given name"
+    echo "                               - Requires -i <intermediate_name> to sign"
+    echo "    -e <IP:ip,DNS:host,...>  SAN list to be used for server or client certificate"
+    echo "                               - Requires -s <server_cert_name> or -c <client_cert_name>"
+    echo "    -x <certificate_name>    Revoke the named certificate"
+    echo "                               - Use with -i <intermediate> to specify a leaf certificate"
+    echo "                               - Otherwise assumes intermediate certificate"
+    echo "    -z <zip_name>            Zip up the relevant certificates, keys, and stores"
+    echo "                               - Use with -i <intermediate> to only zip the public chain and stores"
+    echo "                               - Use with -c or -s to include the keys and keystores"
+}
+
 function _validate_optarg
 {
     if [[ $1 == -* ]];then
@@ -342,11 +181,21 @@ function revoke_intermediate()
     if [[ -f $_root_index_file ]]; then
         local _intermediate_id=$(egrep "^V" $_root_index_file \
             | grep "$_store_revoke_name" | cut -f4)
-        local _cert_to_revoke="${_root_new_certs_dir}/${_intermediate_id}.pem"
-        echo "$_cert_to_revoke"
-        openssl ca -revoke $_cert_to_revoke -config $ROOTCA_CNF_FILE
+        if [[ ! -z $_intermediate_id ]]; then
+            local _cert_to_revoke="${_root_new_certs_dir}/${_intermediate_id}.pem"
+            openssl ca -revoke $_cert_to_revoke -config $ROOTCA_CNF_FILE
+        else
+            echo "There is no intermediate certificate $_store_revoke_name to be revoked."
+        fi
     fi
     _cleanup_intermediate_files
+}
+
+function _cleanup_intermediate_files
+{
+    [[ -d $_intermediate_dir ]] && rm -r $_intermediate_dir
+    [[ -f $_pkcs12_truststore ]] && rm $_pkcs12_truststore
+    [[ -f $_jks_truststore ]] && rm $_jks_truststore
 }
 
 function revoke_leaf()
@@ -354,11 +203,23 @@ function revoke_leaf()
     if [[ -f $_intermediate_index_file ]]; then
         local _leaf_id=$(egrep "^V" $_intermediate_index_file \
             | grep "$_store_revoke_name" | cut -f4)
-        local _cert_to_revoke="${_intermediate_new_certs_dir}/${_leaf_id}.pem"
-        echo "$_cert_to_revoke"
-        openssl ca -revoke $_cert_to_revoke -config $INTERMEDIATE_CNF_FILE
+        if [[ ! -z $_leaf_id ]]; then
+            local _cert_to_revoke="${_intermediate_new_certs_dir}/${_leaf_id}.pem"
+            openssl ca -revoke $_cert_to_revoke -config $INTERMEDIATE_CNF_FILE
+        else
+            echo "There is no leaf certificate $_store_revoke_name to be revoked."
+        fi
+    else
+        echo "There is no intermediate named $_store_intermediate_name."
     fi
-    _cleanup_leaf_files
+    _cleanup_leaf_files  
+}
+
+function _cleanup_leaf_files
+{
+    [[ -d $_leaf_dir ]] && rm -r $_leaf_dir
+    [[ -f $_pkcs12_keystore ]] && rm $_pkcs12_keystore
+    [[ -f $_jks_keystore ]] && rm $_jks_keystore
 }
 
 function create_rootca()
@@ -367,6 +228,44 @@ function create_rootca()
 
     [[ ! -f $_root_private_key ]] && _generate_key $_root_private_key
     [[ ! -f $_root_public_cert ]] && _generate_rootca_cert 
+}
+
+function _prepare_rootca_dirs()
+{
+    _create_directories "$_root_dirs_list"
+    chmod 700 $_root_private_key_dir
+    if [[ ! -f $_root_index_file ]]; then
+        touch $_root_index_file
+        echo -e "unique_subject = yes" > ${_root_index_file}.attr
+    fi
+    [[ ! -f $_root_serial_file ]] && echo 1000 > $_root_serial_file
+}
+
+function _create_directories()
+{
+    for _dir in $1
+    do
+        [[ ! -d $_dir ]] && mkdir -p $_dir
+    done
+}
+
+function _generate_key()
+{
+    echo -e "Creating private key - $1"
+    openssl genrsa -aes256 -out $1 4096
+    chmod 400 $1
+}
+
+function _generate_rootca_cert()
+{
+    echo -e "\nCreating public certificate - $_root_public_cert"
+    echo -e "Using cnf file: $_root_cnf_file"
+    echo -e "Using extension: $_root_extension"
+
+    openssl req -config $ROOTCA_CNF_FILE -key $_root_private_key \
+        -new -x509 -days $_root_days_to_live -sha512 -extensions $_root_extension \
+        -out $_root_public_cert
+    chmod 444 $_root_public_cert
 }
 
 function create_intermediate()
@@ -379,6 +278,48 @@ function create_intermediate()
     [[ ! -f $_intermediate_chain ]] && _create_intermediate_chain
 }
 
+function _prepare_intermediate_dirs()
+{
+    _create_directories "$_intermediate_dirs_list"
+    chmod 700 $_intermediate_private_key_dir
+    if [[ ! -f $_intermediate_index_file ]]; then
+        touch $_intermediate_index_file
+        echo -e "unique_subject = yes" > ${_intermediate_index_file}.attr
+    fi
+    [[ ! -f $_intermediate_serial_file ]] && echo 1000 > $_intermediate_serial_file
+    [[ ! -f $_intermediate_crlnumber ]] && echo 1000 > $_intermediate_crlnumber
+}
+
+function _generate_intermediate_csr()
+{
+    echo -e "\nCreating CSR - $_intermediate_csr_file"
+    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
+
+    sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_intermediate_name," $INTERMEDIATE_CNF_FILE
+    
+    openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
+        -key $_intermediate_private_key -out $_intermediate_csr_file
+}
+
+function _sign_intermediate_csr
+{
+    echo -e "\nCreating signed certificate - $_intermediate_signed_cert"
+    echo -e "Using CSR: $_intermediate_csr_file"
+    echo -e "Using cnf file: $ROOTCA_CNF_FILE"
+    echo -e "Using extension: $_intermediate_extension"
+
+    openssl ca -config $ROOTCA_CNF_FILE -extensions $_intermediate_extension \
+        -days $_intermediate_days_to_live -notext -md sha512 \
+        -in $_intermediate_csr_file -out $_intermediate_signed_cert
+    chmod 444 $_intermediate_signed_cert
+}
+
+function _create_intermediate_chain
+{
+    cat $_intermediate_signed_cert $_root_public_cert > $_intermediate_chain
+    chmod 444 $_intermediate_chain
+}
+
 function create_leaf()
 {
     _prepare_leaf_dirs
@@ -388,16 +329,84 @@ function create_leaf()
     [[ ! -f $_leaf_signed_cert ]] && _sign_leaf_csr
 }
 
+function _prepare_leaf_dirs
+{
+    _create_directories "$_leaf_dirs_list"
+    chmod 700 $_leaf_private_key_dir
+}
+
+function _generate_leaf_csr
+{
+    echo -e "\nCreating CSR - $_leaf_csr_file"
+    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
+
+    sed -i .orig -e "s%\(^subjectAltName *=\).*%\1 $_store_san_extensions%" $INTERMEDIATE_CNF_FILE
+    [[ ! -z $_store_san_extensions ]] && _request_san_extension="-reqexts SAN"
+    sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_leaf_certificate_name," $INTERMEDIATE_CNF_FILE
+
+    openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
+        -key $_leaf_private_key -out $_leaf_csr_file \
+        $_request_san_extension
+}
+
+function _sign_leaf_csr
+{
+    echo -e "\nCreating signed certificate - $_leaf_signed_cert"
+    echo -e "Using intermediate - $_store_intermediate_name"
+    echo -e "Using CSR: $_leaf_csr_file"
+    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
+    echo -e "Using extension: $_leaf_certificate_type"
+    
+    openssl ca -config $INTERMEDIATE_CNF_FILE -extensions $_leaf_certificate_type \
+        -days $_leaf_days_to_live -notext -md sha512 \
+        -in $_leaf_csr_file -out $_leaf_signed_cert
+    chmod 444 $_leaf_signed_cert
+}
+
 function create_truststores()
 {    
     [[ ! -f $_pkcs12_truststore ]] && _generate_pfx_truststore
     [[ ! -f $_jks_truststore ]] && _generate_jks_truststore
 }
 
+function _generate_pfx_truststore
+{
+    echo -e "\nCreating PKCS12 Truststore: $_pkcs12_truststore"
+    openssl pkcs12 -export -nokeys -out $_pkcs12_truststore -in $_intermediate_chain
+    chmod 644 $_pkcs12_truststore
+}
+
+function _generate_jks_truststore
+{
+    echo -e "\nCreating JKS Truststore: $_jks_truststore"
+    echo -e "Importing rootca - $_root_public_cert"
+    keytool -importcert -alias rootca -keystore $_jks_truststore -file $_root_public_cert
+    echo -e "Importing intermediate - $_intermediate_signed_cert"
+    keytool -importcert -alias $_store_intermediate_name \
+        -keystore $_jks_truststore -file $_intermediate_signed_cert
+    chmod 644 $_jks_truststore
+}
+
 function create_keystores()
 {
     [[ ! -f $_pkcs12_keystore ]] && _generate_pfx_keystore
     [[ ! -f $_jks_keystore ]] && _generate_jks_keystore
+}
+
+function _generate_pfx_keystore
+{
+    echo -e "\nCreating PKCS12 Keystore: $_pkcs12_keystore"
+    openssl pkcs12 -export -inkey $_leaf_private_key -in $_leaf_signed_cert \
+        -certfile $_intermediate_chain -out $_pkcs12_keystore
+    chmod 400 $_pkcs12_keystore
+}
+
+function _generate_jks_keystore
+{
+    echo -e "\nCreating JKS Keystore: $_jks_keystore"
+    keytool -importkeystore -srckeystore $_pkcs12_keystore -srcstoretype PKCS12 \
+        -destkeystore $_jks_keystore -deststoretype JKS
+    chmod 400 $_jks_keystore
 }
 
 function zip_certificates
@@ -411,23 +420,23 @@ function zip_certificates
 function _tar_truststores
 {
     [[ -f $_intermediate_chain ]] && tar -cPf $_store_zip_name \
-        -C $(dirname $_intermediate_chain) $_intermediate_chain
+        -C $(dirname $_intermediate_chain) $(basename $_intermediate_chain)
     [[ -f $_pkcs12_truststore ]] && tar -rPf $_store_zip_name \
-        -C $(dirname $_pkcs12_truststore) $_pkcs12_truststore
+        -C $(dirname $_pkcs12_truststore) $(basename $_pkcs12_truststore)
     [[ -f $_jks_truststore ]] && tar -rPf $_store_zip_name \
-        -C $(dirname $_jks_truststore) $_jks_truststore
+        -C $(dirname $_jks_truststore) $(basename $_jks_truststore)
 }
 
 function _tar_keystores
 {
     [[ -f $_leaf_private_key ]] && tar -rPf $_store_zip_name \
-        -C $(dirname $_leaf_private_key) $_leaf_private_key
+        -C $(dirname $_leaf_private_key) $(basename $_leaf_private_key)
     [[ -f $_leaf_signed_cert ]] && tar -rPf $_store_zip_name \
-        -C $(dirname $_leaf_signed_cert) $_leaf_signed_cert
+        -C $(dirname $_leaf_signed_cert) $(basename $_leaf_signed_cert)
     [[ -f $_pkcs12_keystore ]] && tar -rPf $_store_zip_name \
-        -C $(dirname $_pkcs12_keystore) $_pkcs12_keystore
+        -C $(dirname $_pkcs12_keystore) $(basename $_pkcs12_keystore)
     [[ -f $_jks_keystore ]] && tar -rPf $_store_zip_name \
-        -C $(dirname $_jks_keystore) $_jks_keystore
+        -C $(dirname $_jks_keystore) $(basename $_jks_keystore)
 }
 
 main "$@"
