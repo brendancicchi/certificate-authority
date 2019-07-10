@@ -1,7 +1,8 @@
 # certificate-authority README
 
-To run this script, copy the _resources/*.cnf files_ to your desired location
-Configure the CAPS-LOCKED variables at the top of the _conf/ssl-var-configurations.sh_
+### Setup
+To run this script, copy the _resources/*.cnf files_ to your desired location in your file system.
+Configure the CAPS-LOCKED variables at the top of the _conf/ssl-var-configurations.sh_ as seen below.
 
 ```bash
 ##### Begin Common Configurations #####
@@ -18,7 +19,8 @@ INTERMEDIATE_CNF_FILE=$SSL_DIR/cnf_files/intermediate.cnf
 ##### End of Common Configurations #####
 ```
 
-The usage for **certificate-authority** can be seen below:
+### Usage
+The help output for **certificate-authority** can be seen below:
 ```
     Usage:
         -h                       Display this help message.
