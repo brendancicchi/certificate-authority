@@ -1,8 +1,8 @@
 # certificate-authority README
 
 ### Setup
-To run this script, copy the _resources/*.cnf files_ to your desired location in your file system.
-Configure the CAPS-LOCKED variables at the top of the _conf/ssl-var-configurations.sh_ as seen below.
+To run this script, copy the _resources/*.cnf files_ to the desired location in your file system.
+Configure the _CAPS-LOCKED_ variables at the top of the _conf/ssl-var-configurations.sh_ as seen below:
 
 ```bash
 ##### Begin Common Configurations #####
