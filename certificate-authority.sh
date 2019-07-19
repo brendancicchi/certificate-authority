@@ -46,7 +46,7 @@ function parse_arguments()
         echo -e "No arguments were passed\n"
         _print_usage
     fi
-    while getopts ":hlri:c:s:e:x:z:" _opt; do
+    while getopts ":hlri:c:s:e:x:z:p:" _opt; do
         case $_opt in
             h )
                 _print_usage
@@ -86,6 +86,10 @@ function parse_arguments()
                 _validate_optarg $OPTARG
                 _store_zip_name="$OPTARG.tar"
                 ;;
+            p)
+                _validate_optarg $OPTARG
+                _store_password="$OPTARG"
+                ;;
             \?)
                 echo -e "Invalid option: -$OPTARG\n"
                 _print_usage
@@ -121,6 +125,9 @@ function _print_usage()
     echo "    -z <zip_name>            Zip up the relevant certificates, keys, and stores"
     echo "                               - Use with -i <intermediate> to only zip the public chain and stores"
     echo "                               - Use with -c or -s to include the keys and keystores"
+    echo "    -p <password>            Password to be applied to ALL openssl and keytool commands"
+    echo "                               - This is not secure and only meant for testing purposes"
+    echo "                               - Removes all prompting from the user"
 }
 
 function _validate_optarg
@@ -183,7 +190,8 @@ function revoke_intermediate()
             | grep "$_store_revoke_name" | cut -f4)
         if [[ ! -z $_intermediate_id ]]; then
             local _cert_to_revoke="${_root_new_certs_dir}/${_intermediate_id}.pem"
-            openssl ca -revoke $_cert_to_revoke -config $ROOTCA_CNF_FILE
+            [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
+            openssl ca -revoke $_cert_to_revoke -config $ROOTCA_CNF_FILE $_openssl_pass_arg
         else
             echo "There is no intermediate certificate $_store_revoke_name to be revoked."
         fi
@@ -205,7 +213,8 @@ function revoke_leaf()
             | grep "$_store_revoke_name" | cut -f4)
         if [[ ! -z $_leaf_id ]]; then
             local _cert_to_revoke="${_intermediate_new_certs_dir}/${_leaf_id}.pem"
-            openssl ca -revoke $_cert_to_revoke -config $INTERMEDIATE_CNF_FILE
+            [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
+            openssl ca -revoke $_cert_to_revoke -config $INTERMEDIATE_CNF_FILE $_openssl_pass_arg
         else
             echo "There is no leaf certificate $_store_revoke_name to be revoked."
         fi
@@ -252,7 +261,10 @@ function _create_directories()
 function _generate_key()
 {
     echo -e "Creating private key - $1"
-    openssl genrsa -aes256 -out $1 4096
+    
+    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-passout pass:$_store_password"
+    
+    openssl genrsa -aes256 -out $1 $_openssl_pass_arg 4096
     chmod 400 $1
 }
 
@@ -262,9 +274,11 @@ function _generate_rootca_cert()
     echo -e "Using cnf file: $_root_cnf_file"
     echo -e "Using extension: $_root_extension"
 
+    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
+
     openssl req -config $ROOTCA_CNF_FILE -key $_root_private_key \
         -new -x509 -days $_root_days_to_live -sha512 -extensions $_root_extension \
-        -out $_root_public_cert
+        -out $_root_public_cert $_openssl_pass_arg
     chmod 444 $_root_public_cert
 }
 
@@ -295,10 +309,11 @@ function _generate_intermediate_csr()
     echo -e "\nCreating CSR - $_intermediate_csr_file"
     echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
 
+    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
     sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_intermediate_name," $INTERMEDIATE_CNF_FILE
     
     openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
-        -key $_intermediate_private_key -out $_intermediate_csr_file
+        -key $_intermediate_private_key -out $_intermediate_csr_file $_openssl_pass_arg
 }
 
 function _sign_intermediate_csr
@@ -308,9 +323,11 @@ function _sign_intermediate_csr
     echo -e "Using cnf file: $ROOTCA_CNF_FILE"
     echo -e "Using extension: $_intermediate_extension"
 
+    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
+
     openssl ca -config $ROOTCA_CNF_FILE -extensions $_intermediate_extension \
         -days $_intermediate_days_to_live -notext -md sha512 \
-        -in $_intermediate_csr_file -out $_intermediate_signed_cert
+        -in $_intermediate_csr_file -out $_intermediate_signed_cert $_openssl_pass_arg
     chmod 444 $_intermediate_signed_cert
 }
 
@@ -341,12 +358,13 @@ function _generate_leaf_csr
     echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
 
     sed -i .orig -e "s%\(^subjectAltName *=\).*%\1 $_store_san_extensions%" $INTERMEDIATE_CNF_FILE
+    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
     [[ ! -z $_store_san_extensions ]] && _request_san_extension="-reqexts SAN"
     sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_leaf_certificate_name," $INTERMEDIATE_CNF_FILE
 
     openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
         -key $_leaf_private_key -out $_leaf_csr_file \
-        $_request_san_extension
+        $_request_san_extension $_openssl_pass_arg
 }
 
 function _sign_leaf_csr
@@ -357,9 +375,11 @@ function _sign_leaf_csr
     echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
     echo -e "Using extension: $_leaf_certificate_type"
     
+    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
+
     openssl ca -config $INTERMEDIATE_CNF_FILE -extensions $_leaf_certificate_type \
         -days $_leaf_days_to_live -notext -md sha512 \
-        -in $_leaf_csr_file -out $_leaf_signed_cert
+        -in $_leaf_csr_file -out $_leaf_signed_cert $_openssl_pass_arg
     chmod 444 $_leaf_signed_cert
 }
 
@@ -372,18 +392,25 @@ function create_truststores()
 function _generate_pfx_truststore
 {
     echo -e "\nCreating PKCS12 Truststore: $_pkcs12_truststore"
-    openssl pkcs12 -export -nokeys -out $_pkcs12_truststore -in $_intermediate_chain
+    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-passout pass:$_store_password"
+
+    openssl pkcs12 -export -nokeys -out $_pkcs12_truststore -in $_intermediate_chain $_openssl_pass_arg
     chmod 644 $_pkcs12_truststore
 }
 
 function _generate_jks_truststore
 {
     echo -e "\nCreating JKS Truststore: $_jks_truststore"
+
+    [[ ! -z $_store_password ]] && local _keytool_pass_arg="-storepass $_store_password"
+
     echo -e "Importing rootca - $_root_public_cert"
-    keytool -importcert -alias rootca -keystore $_jks_truststore -file $_root_public_cert
+    keytool -importcert -noprompt -alias rootca -keystore $_jks_truststore \
+        -file $_root_public_cert $_keytool_pass_arg
+
     echo -e "Importing intermediate - $_intermediate_signed_cert"
-    keytool -importcert -alias $_store_intermediate_name \
-        -keystore $_jks_truststore -file $_intermediate_signed_cert
+    keytool -importcert -noprompt -alias $_store_intermediate_name $_keytool_pass_arg \
+        -keystore $_jks_truststore -file $_intermediate_signed_cert 
     chmod 644 $_jks_truststore
 }
 
@@ -396,16 +423,24 @@ function create_keystores()
 function _generate_pfx_keystore
 {
     echo -e "\nCreating PKCS12 Keystore: $_pkcs12_keystore"
+
+    [[ ! -z $_store_password ]] && \
+        local _openssl_pass_arg="-passin pass:$_store_password -passout pass:$_store_password"
+
     openssl pkcs12 -export -inkey $_leaf_private_key -in $_leaf_signed_cert \
-        -certfile $_intermediate_chain -out $_pkcs12_keystore
+        -certfile $_intermediate_chain -out $_pkcs12_keystore $_openssl_pass_arg
     chmod 400 $_pkcs12_keystore
 }
 
 function _generate_jks_keystore
 {
     echo -e "\nCreating JKS Keystore: $_jks_keystore"
+    
+    [[ ! -z $_store_password ]] && \
+        local _keytool_pass_arg="-srcstorepass $_store_password -deststorepass $_store_password"
+   
     keytool -importkeystore -srckeystore $_pkcs12_keystore -srcstoretype PKCS12 \
-        -destkeystore $_jks_keystore -deststoretype JKS
+        -destkeystore $_jks_keystore -deststoretype JKS $_keytool_pass_arg
     chmod 400 $_jks_keystore
 }
 
