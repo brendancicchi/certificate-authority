@@ -41,4 +41,7 @@ The help output for **certificate-authority** can be seen below:
         -z <zip_name>            Zip up the relevant certificates, keys, and stores
                                    - Use with -i <intermediate> to only zip the public chain and stores
                                    - Use with -c or -s to include the keys and keystores
+        -p <password>            Password to be applied to ALL openssl and keytool commands
+                                   - This is not secure and only meant for testing purposes
+                                   - Removes all prompting from the user
 ```
