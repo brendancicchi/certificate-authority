@@ -27,6 +27,7 @@ _leaf_certificate_type=
 _store_san_extensions=
 _store_revoke_name=
 _store_zip_name=
+_store_password=
 
 _root_private_key_dir="$ROOTCA_DIR/private"
 _root_private_key="$_root_private_key_dir/ca.key.pem"
