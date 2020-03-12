@@ -385,16 +385,19 @@ function _sign_leaf_csr
 
 function create_truststores()
 {    
-    [[ ! -f $_pkcs12_truststore ]] && _generate_pfx_truststore
     [[ ! -f $_jks_truststore ]] && _generate_jks_truststore
+    [[ ! -f $_pkcs12_truststore ]] && _generate_pfx_truststore
 }
 
+# Due to a limitation of not being able to add OID 2.16.840.1.113894.746875.1.1 to the PKCS12 store, Java cannot read the certs
+#   - https://github.com/openssl/openssl/issues/6684
+# As a result, we must convert the JKS file to PKCS12, we cannot use openssl to generate the PKCS12 truststore
 function _generate_pfx_truststore
 {
     echo -e "\nCreating PKCS12 Truststore: $_pkcs12_truststore"
-    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-passout pass:$_store_password"
+    [[ ! -z $_store_password ]] && local _keytool_pass_arg="-srcstorepass $_store_password -deststorepass $_store_password"
 
-    openssl pkcs12 -export -nokeys -out $_pkcs12_truststore -in $_intermediate_chain $_openssl_pass_arg
+    keytool -importkeystore -srckeystore $_jks_truststore -destkeystore $_pkcs12_truststore -deststoretype PKCS12 $_keytool_pass_arg
     chmod 644 $_pkcs12_truststore
 }
 
