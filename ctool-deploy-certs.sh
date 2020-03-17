@@ -173,5 +173,3 @@ function _optional_restart_dse()
 
 
 main "$@"
-
-# [[ ! -e /home/automaton/.cassandra/certs/cqlsh.key ]] && sudo ln -s /home/automaton/.cassandra/certs/*.key.pem /home/automaton/.cassandra/certs/cqlsh.key || echo; \
