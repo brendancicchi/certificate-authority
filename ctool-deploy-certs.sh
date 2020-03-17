@@ -2,7 +2,7 @@
 
 PROVIDER='nebula'
 CTOOL='PYENV_VERSION=2.7.16/envs/ctool-env ctool --provider=${PROVIDER}'
-CA='/Users/brendancicchi/Development/certificate-authority/certificate-authority.sh'
+CA='./certificate-authority.sh'
 PASSWORD='cassandra'
 
 
@@ -86,7 +86,7 @@ function _print_usage()
     echo "    -c                       CTOOL cluster name"
     echo "-> Optional Arguments:"    
     echo "    -a                       Use mutual authentication (2-way SSL) for clients"
-    echo "                               - Applies to JMX SSL if enabled"
+    # echo "                               - Applies to JMX SSL if enabled"
     echo "    -h                       Display this help message."
     echo "    -o                       Allow optional client connections"
     echo "    -r                       Restart the nodes in parallel"
@@ -123,8 +123,10 @@ function _configure_dse_nodes()
     sudo chown -R cassandra:cassandra /etc/dse/security/'"
   # Configure client_encryption_options
   eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.enabled -v '\"true\"' $_cluster_name"
-  eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.keystore -v '\"\/etc\/dse\/security\/node-keystore.jks\"' $_cluster_name" 
+  eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.keystore -v '\"\/etc\/dse\/security\/node-keystore.jks\"' $_cluster_name"
+  eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.keystore_password -v '\"$PASSWORD\"' $_cluster_name"
   eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.truststore -v '\"\/etc\/dse\/security\/$_cluster_name-truststore.jks\"' $_cluster_name"
+  eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.truststore_password -v '\"$PASSWORD\"' $_cluster_name"
   [[ ! -z $_optional_ssl ]] && eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.optional -v true $_cluster_name"
   [[ -z $_optional_ssl ]] && eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.optional -v false $_cluster_name"
   [[ ! -z $_require_client_auth ]] && eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.require_client_auth -v true $_cluster_name"
@@ -133,7 +135,9 @@ function _configure_dse_nodes()
   # Configure server_encryption_options
   eval "$CTOOL yaml -o set -f cassandra.yaml -k server_encryption_options.internode_encryption -v '\"all\"' $_cluster_name"
   eval "$CTOOL yaml -o set -f cassandra.yaml -k server_encryption_options.keystore -v '\"\/etc\/dse\/security\/node-keystore.jks\"' $_cluster_name"
+  eval "$CTOOL yaml -o set -f cassandra.yaml -k server_encryption_options.keystore_password -v '\"$PASSWORD\"' $_cluster_name"
   eval "$CTOOL yaml -o set -f cassandra.yaml -k server_encryption_options.truststore -v '\"\/etc\/dse\/security\/$_cluster_name-truststore.jks\"' $_cluster_name"
+  eval "$CTOOL yaml -o set -f cassandra.yaml -k server_encryption_options.truststore_password -v '\"$PASSWORD\"' $_cluster_name"
   eval "$CTOOL yaml -o set -f cassandra.yaml -k server_encryption_options.require_endpoint_verification -v true $_cluster_name"
   eval "$CTOOL yaml -o set -f cassandra.yaml -k server_encryption_options.require_client_auth -v true $_cluster_name"
 }
@@ -145,11 +149,12 @@ validate = true
 certfile=/etc/dse/security/ca-$_cluster_name-chain.certs.pem"
   if [ ! -z $_require_client_auth ]; then
     _generate_cqlsh_certificates
-    eval "$CTOOL run $_cluster_name all 'mkdir -p /home/automaton/.cassandra/certs/ && \
+    eval "$CTOOL run $_cluster_name all \"mkdir -p /home/automaton/.cassandra/certs/ && \
     tar -xf /home/automaton/cqlsh.tar.gz -C /home/automaton/.cassandra/certs/ && \
-    [[ ! -e /home/automaton/.cassandra/certs/cqlsh.key ]] && sudo ln -s /home/automaton/.cassandra/certs/*.key.pem /home/automaton/.cassandra/certs/cqlsh.key && \
-    cat /home/automaton/.cassandra/certs/*.cert.pem /home/automaton/.cassandra/certs/*.certs.pem >| /home/automaton/.cassandra/certs/cqlsh.chain.pem'"
-    _cqlshrc=$(echo -e "$_cqlshrc\nuserkey=/home/automaton/.cassandra/certs/cqlsh.key.pem\nusercert=/home/automaton/.cassandra/certs/cqlsh.chain.pem")
+    openssl rsa -in /home/automaton/.cassandra/certs/*.key.pem -passin pass:$PASSWORD -out /home/automaton/.cassandra/certs/cqlsh.key && \
+    chmod 600 /home/automaton/.cassandra/certs/cqlsh.key && \
+    cat /home/automaton/.cassandra/certs/*.cert.pem /home/automaton/.cassandra/certs/*chain.certs.pem >| /home/automaton/.cassandra/certs/cqlsh.chain.pem\""
+    _cqlshrc=$(echo -e "$_cqlshrc\nuserkey=/home/automaton/.cassandra/certs/cqlsh.key\nusercert=/home/automaton/.cassandra/certs/cqlsh.chain.pem")
   fi
 
   eval "$CTOOL run $_cluster_name all 'mkdir -p /home/automaton/.cassandra/ && \
@@ -168,3 +173,5 @@ function _optional_restart_dse()
 
 
 main "$@"
+
+# [[ ! -e /home/automaton/.cassandra/certs/cqlsh.key ]] && sudo ln -s /home/automaton/.cassandra/certs/*.key.pem /home/automaton/.cassandra/certs/cqlsh.key || echo; \
