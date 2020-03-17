@@ -116,7 +116,7 @@ extendedKeyUsage = clientAuth, emailProtection
 [ server_cert ]
 # Extensions for server certificates (`man x509v3_config`).
 basicConstraints = CA:FALSE
-nsCertType = server
+nsCertType = server, client
 nsComment = "OpenSSL Generated Server Certificate"
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer:always
