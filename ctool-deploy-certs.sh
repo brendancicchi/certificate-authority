@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
+##### Begin Configurations #####
 PROVIDER='nebula'
-CTOOL='PYENV_VERSION=2.7.16/envs/ctool-env ctool --provider=${PROVIDER}'
-CA='./certificate-authority.sh'
+CTOOL='PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}'
+CA='/Users/brendancicchi/Development/certificate-authority/certificate-authority.sh'
 PASSWORD='cassandra'
-
+##### End Configurations #####
 
 function main()
 {
