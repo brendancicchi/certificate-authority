@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+#
+# File: certificate-authority.sh
+# Author: Brendan Cicchi
+#
+# Created: Tuesday, July 2 2019
+#
+
 function main()
 {
     source $(dirname ${BASH_SOURCE[0]})/conf/ssl-var-configuration.sh   

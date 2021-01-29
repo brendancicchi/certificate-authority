@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 
+#
+# File: ctool-deploy-certs.sh
+# Author: Brendan Cicchi
+#
+# Created: Tuesday, July 2 2019
+#
+
 ##### Begin Configurations #####
-PROVIDER='nebula'
-CTOOL='PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}'
-CA='/Users/brendancicchi/Development/certificate-authority/certificate-authority.sh'
-PASSWORD='cassandra'
+PROVIDER="nebula"
+CTOOL="PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}"
+CA="$(dirname $0)/../certificate-authority.sh"
+PASSWORD="cassandra"
 ##### End Configurations #####
 
 function main()
@@ -87,7 +94,6 @@ function _print_usage()
     echo "    -c                       CTOOL cluster name"
     echo "-> Optional Arguments:"    
     echo "    -a                       Use mutual authentication (2-way SSL) for clients"
-    # echo "                               - Applies to JMX SSL if enabled"
     echo "    -h                       Display this help message."
     echo "    -o                       Allow optional client connections"
     echo "    -r                       Restart the nodes in parallel"
