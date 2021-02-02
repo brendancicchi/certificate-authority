@@ -10,12 +10,12 @@
 ##### Begin Configurations #####
 export PROVIDER="nebula"
 export CTOOL="PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}"
-export CA="$(dirname $(echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"))/certificate-authority.sh"
+export CA="$(dirname $(echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"))/../certificate-authority.sh" # https://stackoverflow.com/a/3915420/10156762
 export PASSWORD="cassandra"
 export TMP="/tmp"
-CLUSTER_NAME="datastax-ssl-training"
+export CLUSTER_NAME="datastax-ssl-training"
 INSTANCE_TYPE="c4.large"
-DSE_VERSION="6.8.9"
+DSE_VERSION="5.1.20"
 ##### End Configurations #####
 
 _script_path="$(dirname $0)"
@@ -32,10 +32,12 @@ function main()
     fi
     if [[ ! -z $_tear_down_env ]]; then
         tear_down_environment
-        exit 1
+        exit 0
     fi
     setup_cluster
     execute_scenario
+    log "Scenario $_scenario_num is good to go. Knock yourself out."
+    exit 0
 }
 
 function parse_arguments()
@@ -55,12 +57,12 @@ function parse_arguments()
                 _tear_down_env="true"
                 ;;
             \?)
-                echo -e "\nInvalid option: -$OPTARG"
+                log "ERROR: Invalid option: -$OPTARG"
                 _print_usage
                 exit 1
                 ;;
             :)
-                echo -e "\nOption -$OPTARG requires an argument."
+                log "ERROR: Option -$OPTARG requires an argument."
                 _print_usage
                 exit 1
                 ;;
@@ -79,7 +81,7 @@ function _print_usage()
 function _validate_optarg()
 {
     if [[ $1 == -* ]]; then
-        echo -e "Missing an argument\n"
+        log "ERROR: Missing an argument"
         exit 1
     fi
 }
@@ -87,25 +89,25 @@ function _validate_optarg()
 function validate_arguments()
 {
     if [[ -z $_scenario_num && -z $_tear_down_env ]]; then
-        echo -e "Either a scenario (-s) or cleanup (-x) must be executed\n"
+        log "ERROR: Either a scenario (-s) or cleanup (-x) must be executed"
         return 1
     fi
     if [[ ! -z $_scenario_num && ! -z $_tear_down_env ]]; then
-        echo -e "A scenario and cleanup cannot both be executed\n"
+        log "ERROR: A scenario and cleanup cannot both be executed"
         return 1
     fi
     if [[ ! -z $_scenario_num ]]; then
         _scenario_nums=$(ls -1 $_script_path/scenarios/ | grep -Eo '[0-9]+$')
         if ! echo "$_scenario_nums" | grep -w $_scenario_num > /dev/null; then
-            echo -e "An invalid scenario was attempted: $_scenario_num"
+            log "ERROR: An invalid scenario was attempted: $_scenario_num"
             return 1
         fi
     fi
 }
 
 function log {
-  DT="$(date -u '+%H:%M:%S')"
-  echo "[$DT]: $1"
+    DT="$(date -u '+%H:%M:%S')"
+    echo "[$DT] - $1"
 }
 
 function setup_cluster()
@@ -115,6 +117,9 @@ function setup_cluster()
         eval "$CTOOL launch $CLUSTER_NAME 2 -i $INSTANCE_TYPE > /dev/null"
         log "Installing DSE $DSE_VERSION..."
         eval "$CTOOL install $CLUSTER_NAME enterprise -v $DSE_VERSION-1 -n 8 -z GossipingPropertyFileSnitch > /dev/null"
+        log "Starting nodes with proper configurations..."
+        eval "$CTOOL start $CLUSTER_NAME > /dev/null"
+        log "Nodes successfully started"
     else
         log "$CLUSTER_NAME has already been launched on $PROVIDER"
     fi
@@ -129,9 +134,20 @@ function setup_cluster()
 
 function execute_scenario()
 {
-    _launch_path="$_script_path/scenarios/scenario${_scenario_num}/setup.sh"
+    _launch_path="$_script_path/scenarios/scenario$_scenario_num/setup.sh"
     log "Deploying scenario $_scenario_num via $_launch_path"
-    $_script_path/scenarios/scenario${_scenario_num}/setup.sh
+    $_script_path/scenarios/scenario$_scenario_num/setup.sh
+    _exit_code=$?
+    [[ $_exit_code -eq 0 ]] && restart_node "0"
+    [[ $_exit_code -eq 1 ]] && restart_node "all"
+    [[ $_exit_code -eq 10 ]] && log "Failed to execute $_script_path/scenarios/scenario$_scenario_num/setup.sh"
+}
+
+function restart_node()
+{
+    log "Restarting DSE node ($1)..."
+    eval "$CTOOL restart --dont-wait $CLUSTER_NAME $1 > /dev/null"
+    log "Restart complete"
 }
 
 function tear_down_environment()

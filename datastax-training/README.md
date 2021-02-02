@@ -33,7 +33,10 @@ Usage:
     -x                        Destroy training environment
 ```
 
+The first scenario launched can take 10 minutes as the instances need to be launched as well as DSE configured and started. Subsequent scenario configurations will be much quicker.
+
 ## Scenarios
 
-* [Scenario 1](scenarios/scenario1/README.md) - `./run-scenario.sh -s 1`
-* [Scenario 2](scenarios/scenario2/README.md) - `./run-scenario.sh -s 2`
+The **Solution** links contain spoilers. Please attempt to correct the scenario yourself before viewing the solution.
+
+* Scenario 1 - `./run-scenario.sh -s 1` -> [Solution](scenarios/scenario1/SOLUTION.md)

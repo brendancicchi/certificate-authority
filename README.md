@@ -49,3 +49,7 @@ The help output for **certificate-authority** can be seen below:
 # Integrations
 
 * [CTool Integration](integrations/README.md#ctool-integration)
+
+# SSL Training
+
+* [DataStax SSL Training](datastax-training/README.md)

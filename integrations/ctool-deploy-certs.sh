@@ -107,7 +107,7 @@ function _print_usage()
 
 function log {
   DT="$(date -u '+%H:%M:%S')"
-  echo "[$DT]: $1"
+  echo "[$DT] - $1"
 }
 
 function _generate_dse_certificates()
@@ -116,9 +116,10 @@ function _generate_dse_certificates()
   for ((i=0;i<${#_node_ips_array[@]};++i)); do
     _cn="node"$i
     _sans="IP:${_node_ips_array[i]},DNS:${_node_hosts_array[i]}"
+    [[ -f $_tmp_dir/$_cluster_name-$_cn.tar.gz ]] && rm $_tmp_dir/$_cluster_name-$_cn.tar.gz
     $CA -r -i $_cluster_name -s $_cn -e $_sans -z $_tmp_dir/$_cluster_name-$_cn -p $PASSWORD &> /dev/null
     eval "$CTOOL scp $_cluster_name $i $_tmp_dir/$_cluster_name-$_cn.tar.gz /home/automaton/node.tar.gz > /dev/null"
-    rm -f $_cluster_name-$_cn.tar.gz
+    rm $_tmp_dir/$_cluster_name-$_cn.tar.gz
   done
 }
 
@@ -128,9 +129,10 @@ function _generate_cqlsh_certificates()
   for ((i=0;i<${#_node_ips_array[@]};++i)); do
     _cn="cqlsh"$i
     _sans="IP:${_node_ips_array[i]},DNS:${_node_hosts_array[i]}"
+    [[ -f $_tmp_dir/$_cluster_name-$_cn.tar.gz ]] && rm $_tmp_dir/$_cluster_name-$_cn.tar.gz
     $CA -r -i $_cluster_name -c $_cn -e $_sans -z $_tmp_dir/$_cluster_name-$_cn -p $PASSWORD &> /dev/null
-    eval "$CTOOL scp $_cluster_name $i $_tmp_dir/$_cluster_name-$_cn.tar.gz /home/automaton/cqlsh.tar.gz > /dev/null"
-    rm -f $_cluster_name-$_cn.tar.gz
+    eval "$CTOOL scp $_cluster_name $i $_tmp_dir/$_cluster_name-$_cn.tar.gz /home/automaton/cqlsh.tar.gz"
+    rm $_tmp_dir/$_cluster_name-$_cn.tar.gz
   done
 }
 
