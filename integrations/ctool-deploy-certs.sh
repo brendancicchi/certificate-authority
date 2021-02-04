@@ -151,6 +151,7 @@ function _configure_dse_nodes()
   eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.keystore_password -v '\"$PASSWORD\"' $_cluster_name > /dev/null"
   eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.truststore -v '\"\/etc\/dse\/security\/$_cluster_name-truststore.jks\"' $_cluster_name > /dev/null"
   eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.truststore_password -v '\"$PASSWORD\"' $_cluster_name > /dev/null"
+  eval "$CTOOL yaml -o delete -f cassandra.yaml -k client_encryption_options.cipher_suites $_cluster_name > /dev/null"
   [[ ! -z $_optional_ssl ]] && eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.optional -v true $_cluster_name > /dev/null"
   [[ -z $_optional_ssl ]] && eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.optional -v false $_cluster_name > /dev/null"
   [[ ! -z $_require_client_auth ]] && eval "$CTOOL yaml -o set -f cassandra.yaml -k client_encryption_options.require_client_auth -v true $_cluster_name > /dev/null"
@@ -165,6 +166,7 @@ function _configure_dse_nodes()
   eval "$CTOOL yaml -o set -f cassandra.yaml -k server_encryption_options.truststore_password -v '\"$PASSWORD\"' $_cluster_name > /dev/null"
   eval "$CTOOL yaml -o set -f cassandra.yaml -k server_encryption_options.require_endpoint_verification -v true $_cluster_name > /dev/null"
   eval "$CTOOL yaml -o set -f cassandra.yaml -k server_encryption_options.require_client_auth -v true $_cluster_name > /dev/null"
+  eval "$CTOOL yaml -o delete -f cassandra.yaml -k server_encryption_options.cipher_suites $_cluster_name > /dev/null"
 }
 
 function _configure_cqlsh()
