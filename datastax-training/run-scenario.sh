@@ -10,7 +10,6 @@
 ##### Begin Configurations #####
 export PROVIDER="nebula"
 export CTOOL="PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}"
-export CA="$(dirname $(echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"))/../certificate-authority.sh" # https://stackoverflow.com/a/3915420/10156762
 export PASSWORD="cassandra"
 export TMP="/tmp"
 export CLUSTER_NAME="datastax-ssl-training"
@@ -18,6 +17,7 @@ INSTANCE_TYPE="c4.large"
 DSE_VERSION="5.1.20"
 ##### End Configurations #####
 
+export CA="$(dirname $(echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"))/../certificate-authority.sh" # https://stackoverflow.com/a/3915420/10156762
 _script_path="$(dirname $0)"
 _cassandra_yaml_path="/etc/dse/cassandra/cassandra.yaml"
 _scenario_num=
@@ -117,11 +117,15 @@ function setup_cluster()
         eval "$CTOOL launch $CLUSTER_NAME 2 -i $INSTANCE_TYPE > /dev/null"
         log "Installing DSE $DSE_VERSION..."
         eval "$CTOOL install $CLUSTER_NAME enterprise -v $DSE_VERSION-1 -n 8 -z GossipingPropertyFileSnitch > /dev/null"
-        log "Starting nodes with proper configurations..."
-        eval "$CTOOL start $CLUSTER_NAME > /dev/null"
-        log "Nodes successfully started"
     else
         log "$CLUSTER_NAME has already been launched on $PROVIDER"
+    fi
+    log "Validating nodes have started..."
+    if ! eval "$CTOOL start $CLUSTER_NAME > /dev/null"; then
+        log "ERROR: Nodes failed to start. Nodes must be either be up or able to be started prior to launching a scenario."
+        exit 1
+    else
+        log "Nodes successfully started"
     fi
     if ! eval "$CTOOL run $CLUSTER_NAME 0 'ls -1 | grep -w node.tar.gz' > /dev/null"; then
         log "Performing initial SSL configuration for training..."
@@ -145,8 +149,8 @@ function execute_scenario()
 
 function restart_node()
 {
-    log "Restarting DSE node ($1)..."
-    eval "$CTOOL restart --dont-wait $CLUSTER_NAME $1 > /dev/null"
+    [[ $1 -eq "all" ]] && log "Restarting DSE nodes ($1)..." || log "Restarting DSE node ($1)..."
+    eval "$CTOOL restart --dont-wait --parallel $CLUSTER_NAME $1 > /dev/null"
     log "Restart complete"
 }
 
