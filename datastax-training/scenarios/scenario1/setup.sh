@@ -41,10 +41,11 @@ function initial_setup {
 
 function setup_scenario {
     log "Configuring $_scenario..."
-    _node_ip=($(echo "$_ctool_info" | grep 'public hostname' | tail -n 1 | cut -d ' ' -f3))
-    _node_host=($(echo "$_ctool_info" | grep 'private hostname' | tail -n 1 | cut -d ' ' -f3))
+    _ctool_info=$(eval "$CTOOL info $CLUSTER_NAME")
+    _node_ip=($(echo "$_ctool_info" | grep 'public hostname' | head -n 1 | cut -d ' ' -f3))
+    _node_host=($(echo "$_ctool_info" | grep 'private hostname' | head -n 1 | cut -d ' ' -f3))
     _sans="IP:$_node_ip,DNS:$_node_host"
-    $CA -i $CLUSTER_NAME -p $PASSWORD -s "$_scenario" -z $TMP/working_$_scenario &> /dev/null
+    $CA -i $CLUSTER_NAME -p $PASSWORD -s $_scenario -e $_sans -z $TMP/working_$_scenario &> /dev/null
     tar -xf $TMP/working_$_scenario.tar.gz -C $TMP
     openssl pkcs12 -export \
       -in $TMP/$_scenario.cert.pem \
@@ -58,12 +59,14 @@ function setup_scenario {
     eval "$CTOOL run $CLUSTER_NAME 0 \"\
       [[ ! -d /home/automaton/$CLUSTER_NAME/$_scenario/ ]] && mkdir -p /home/automaton/$CLUSTER_NAME/$_scenario/; \
       tar -xf /home/automaton/$_scenario.tar.gz -C /home/automaton/$CLUSTER_NAME/$_scenario/; \
+      chown -R cassandra: /home/automaton/$CLUSTER_NAME/$_scenario/; \
       rm /home/automaton/$_scenario.tar.gz
       \" > /dev/null"
     eval "$CTOOL yaml $CLUSTER_NAME 0 -o set -f cassandra.yaml -k server_encryption_options.keystore \
       -v '\"\/home\/automaton\/$CLUSTER_NAME\/$_scenario\/$_scenario.jks\"' > /dev/null"
     eval "$CTOOL yaml $CLUSTER_NAME 0 -o set -f cassandra.yaml -k server_encryption_options.truststore \
       -v '\"\/home\/automaton\/$CLUSTER_NAME\/$_scenario\/$CLUSTER_NAME-truststore.jks\"' > /dev/null"
+    eval "$CTOOL yaml $CLUSTER_NAME 0 -o delete -f cassandra.yaml -k server_encryption_options.cipher_suites > /dev/null"
     log "$_scenario was successfully configured"
 }
 
