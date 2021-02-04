@@ -7,13 +7,12 @@
 
 ## Setup
 
-Configure the _CAPS-LOCKED_ variables at the top of `run-scenario.sh`, namely:
+Configure the _CAPS-LOCKED_ variables in the configuration block, at the top of `run-scenario.sh`, as necessary to work with your environment:
 
 ```
 ##### Begin Configurations #####
 export PROVIDER="nebula"
 export CTOOL="PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}"
-export CA="$(dirname $(echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"))/certificate-authority.sh"
 export PASSWORD="cassandra"
 export TMP="/tmp"
 CLUSTER_NAME="datastax-ssl-training"
@@ -34,6 +33,12 @@ Usage:
 ```
 
 The first scenario launched can take 10 minutes as the instances need to be launched as well as DSE configured and started. Subsequent scenario configurations will be much quicker.
+
+If the `ctool` cluster is manually destroyed, you must remove the `certificate-authority` entries for the cluster manually as well before relaunching.
+
+```
+certificate-authority -x {CLUSTER_NAME} -p {PASSWORD}
+```
 
 ## Scenarios
 
