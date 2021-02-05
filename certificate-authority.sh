@@ -208,7 +208,7 @@ function revoke_intermediate()
 
 function _cleanup_intermediate_files
 {
-    [[ -d $_intermediate_dir ]] && rm -r $_intermediate_dir
+    [[ -d $_intermediate_dir ]] && rm -rf $_intermediate_dir
     [[ -f $_pkcs12_truststore ]] && rm $_pkcs12_truststore
     [[ -f $_jks_truststore ]] && rm $_jks_truststore
 }
@@ -233,9 +233,9 @@ function revoke_leaf()
 
 function _cleanup_leaf_files
 {
-    [[ -d $_leaf_dir ]] && rm -r $_leaf_dir
-    [[ -f $_pkcs12_keystore ]] && rm $_pkcs12_keystore
-    [[ -f $_jks_keystore ]] && rm $_jks_keystore
+    [[ -d $_leaf_dir ]] && rm -rf $_leaf_dir
+    [[ -f $_pkcs12_keystore ]] && rm -f $_pkcs12_keystore
+    [[ -f $_jks_keystore ]] && rm -f $_jks_keystore
 }
 
 function create_rootca()
