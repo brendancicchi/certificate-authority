@@ -11,8 +11,10 @@
 [[ -z $PROVIDER ]] && PROVIDER="nebula"
 [[ -z $CTOOL ]] && CTOOL="PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}"
 [[ -z $PASSWORD ]] && PASSWORD="cassandra"
-[[ -z $CA ]] && CA="$(dirname $0)/../certificate-authority.sh"
 ##### End Configurations #####
+
+[[ -z $CA ]] && CA="$(dirname $0)/../certificate-authority.sh"
+_script_name="$(basename $0)"
 
 function main()
 {
@@ -106,8 +108,8 @@ function _print_usage()
 }
 
 function log {
-  DT="$(date -u '+%H:%M:%S')"
-  echo "[$DT] - $1"
+    DT="$(date -u '+%H:%M:%S')"
+    echo "$DT [$_script_name] - $1"
 }
 
 function _generate_dse_certificates()

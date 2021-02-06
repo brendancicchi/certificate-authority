@@ -13,6 +13,8 @@
 # 2 - Do not restart node
 # 10 - Error in script
 
+_script_name="$(basename $0)"
+
 function main {
     validate_launch_variables
     initial_setup
@@ -22,7 +24,7 @@ function main {
 
 function log {
     DT="$(date -u '+%H:%M:%S')"
-    echo "[$DT] - $1"
+    echo "$DT [$_script_name] - $1"
 }
 
 function validate_launch_variables {

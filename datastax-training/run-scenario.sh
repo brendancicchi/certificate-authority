@@ -19,6 +19,7 @@ DSE_VERSION="6.8.9"
 
 export CA="$(dirname $(echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"))/../certificate-authority.sh" # https://stackoverflow.com/a/3915420/10156762
 _script_path="$(dirname $0)"
+_script_name="$(basename $0)"
 _cassandra_yaml_path="/etc/dse/cassandra/cassandra.yaml"
 _scenario_num=
 _tear_down_env=
@@ -107,7 +108,7 @@ function validate_arguments()
 
 function log {
     DT="$(date -u '+%H:%M:%S')"
-    echo "[$DT] - $1"
+    echo "$DT [$_script_name] - $1"
 }
 
 function setup_cluster()
