@@ -14,7 +14,7 @@ export PASSWORD="cassandra"
 export TMP="/tmp"
 export CLUSTER_NAME="datastax-ssl-training"
 INSTANCE_TYPE="c4.large"
-DSE_VERSION="5.1.20"
+DSE_VERSION="6.8.9"
 ##### End Configurations #####
 
 export CA="$(dirname $(echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"))/../certificate-authority.sh" # https://stackoverflow.com/a/3915420/10156762
@@ -120,19 +120,19 @@ function setup_cluster()
     else
         log "$CLUSTER_NAME has already been launched on $PROVIDER"
     fi
-    log "Validating nodes have started..."
-    if ! eval "$CTOOL start $CLUSTER_NAME > /dev/null"; then
-        log "ERROR: Nodes failed to start. Nodes must be either be up or able to be started prior to launching a scenario."
-        exit 1
-    else
-        log "Nodes successfully started"
-    fi
     if ! eval "$CTOOL run $CLUSTER_NAME 0 'ls -1 | grep -w node.tar.gz' > /dev/null"; then
         log "Performing initial SSL configuration for training..."
         $_script_path/../integrations/ctool-deploy-certs.sh -aoc $CLUSTER_NAME -t $TMP
         log "SSL configuration complete"
     else
         log "Cluster has already been configured for SSL"
+    fi
+    log "Validating nodes have started..."
+    if ! eval "$CTOOL start $CLUSTER_NAME > /dev/null"; then
+        log "ERROR: Nodes failed to start. Nodes must be either be up or able to be started prior to launching a scenario."
+        exit 1
+    else
+        log "Nodes successfully started"
     fi
 }
 
