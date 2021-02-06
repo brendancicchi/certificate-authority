@@ -45,3 +45,5 @@ certificate-authority -x {CLUSTER_NAME} -p {PASSWORD}
 The **Solution** links contain spoilers. Please attempt to correct the scenario yourself before viewing the solution.
 
 * Scenario 1 - `./run-scenario.sh -s 1` -> [Solution](scenarios/scenario1/SOLUTION.md)
+* Scenario 2 - `./run-scenario.sh -s 2` -> [Solution](scenarios/scenario2/SOLUTION.md)
+* Scenario 3 - `./run-scenario.sh -s 3` -> [Solution](scenarios/scenario3/SOLUTION.md)
