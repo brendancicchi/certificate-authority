@@ -17,6 +17,15 @@ INTERMEDIATE_CNF_FILE=$SSL_DIR/cnf_files/intermediate.cnf
 # The below section should not be touched by the typical user
 ##### END DISCLAIMER ######
 
+if [[ ! -d $SSL_DIR || ! -d $ROOTCA_DIR || ! -f $ROOTCA_CNF_FILE || ! -f $INTERMEDIATE_CNF_FILE ]]; then
+    echo "ERROR: Please follow the setup instructions for certificate-authority in the README"
+    [[ ! -d $SSL_DIR ]] && echo "  - Missing: $SSL_DIR"
+    [[ ! -d $ROOTCA_DIR ]] && echo "  - Missing: $ROOTCA_DIR"
+    [[ ! -f $ROOTCA_CNF_FILE ]] && echo "  - Missing: $ROOTCA_CNF_FILE"
+    [[ ! -f $INTERMEDIATE_CNF_FILE ]] && echo "  - Missing: $INTERMEDIATE_CNF_FILE"
+    exit 1
+fi
+
 _flag_list_certs=
 _flag_rootca=
 _store_intermediate_name=
