@@ -1,4 +1,4 @@
-# Scenario 1 Solution (Spoilers)
+# Scenario 3 Solution (Spoilers)
 
 NOTE: Please be sure to actually make an attempt at the scenario as this is meant to be a learning exercise.
 
