@@ -54,7 +54,6 @@ function parse_arguments()
                 _scenario_num="$OPTARG"
                 ;;
             x )
-                _validate_optarg $OPTARG
                 _tear_down_env="true"
                 ;;
             \?)

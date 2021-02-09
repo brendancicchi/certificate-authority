@@ -52,6 +52,7 @@ function setup_scenario {
     rm -rf $TMP
     eval "$CTOOL run $CLUSTER_NAME 0 \"\
       [[ ! -d /home/automaton/$CLUSTER_NAME/$_scenario/ ]] && mkdir -p /home/automaton/$CLUSTER_NAME/$_scenario/; \
+      sudo chown -R automaton:automaton /home/automaton/$CLUSTER_NAME/; \
       tar -xf /home/automaton/$_scenario.tar.gz -C /home/automaton/$CLUSTER_NAME/$_scenario/; \
       sudo chown -R cassandra:cassandra /home/automaton/$CLUSTER_NAME/$_scenario/; \
       rm /home/automaton/$_scenario.tar.gz \
