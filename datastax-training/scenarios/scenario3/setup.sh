@@ -43,7 +43,7 @@ function initial_setup {
 
 function setup_scenario {
     log "Configuring $_scenario..."
-    $CA -i $CLUSTER_NAME -p $PASSWORD -s $_scenario -z $TMP/$_scenario &> /dev/null
+    $CA -i $CLUSTER_NAME -p $PASSWORD -s $_scenario -z $TMP/$_scenario
     eval "$CTOOL scp $CLUSTER_NAME 0 $TMP/$_scenario.tar.gz /home/automaton/"
     rm -rf $TMP
     eval "$CTOOL run $CLUSTER_NAME 0 \"\

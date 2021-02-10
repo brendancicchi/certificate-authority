@@ -47,14 +47,14 @@ function setup_scenario {
     _node_ip=($(echo "$_ctool_info" | grep 'public hostname' | head -n 1 | cut -d ' ' -f3))
     _node_host=($(echo "$_ctool_info" | grep 'private hostname' | head -n 1 | cut -d ' ' -f3))
     _sans="IP:$_node_ip,DNS:$_node_host"
-    $CA -i $CLUSTER_NAME -p $PASSWORD -s $_scenario -e $_sans -z $TMP/working_$_scenario &> /dev/null
+    $CA -i $CLUSTER_NAME -p $PASSWORD -s $_scenario -e $_sans -z $TMP/working_$_scenario
     tar -xf $TMP/working_$_scenario.tar.gz -C $TMP
     openssl pkcs12 -export \
       -in $TMP/$_scenario.cert.pem \
       -inkey $TMP/$_scenario.key.pem -passin pass:$PASSWORD \
       -out $TMP/$_scenario.p12 -password pass:$PASSWORD
     keytool -importkeystore -srckeystore $TMP/$_scenario.p12 -srcstoretype PKCS12 -srcstorepass $PASSWORD \
-      -destkeystore $TMP/$_scenario.jks -deststoretype JKS -deststorepass $PASSWORD &> /dev/null
+      -destkeystore $TMP/$_scenario.jks -deststoretype JKS -deststorepass $PASSWORD 2> /dev/null
     tar -czPf $TMP/$_scenario.tar.gz -C $TMP $_scenario.jks datastax-ssl-training-truststore.jks
     eval "$CTOOL scp $CLUSTER_NAME 0 $TMP/$_scenario.tar.gz /home/automaton"
     rm -rf $TMP

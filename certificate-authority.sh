@@ -45,6 +45,7 @@ function main()
         create_keystores
     fi
     [[ ! -z $_store_zip_name ]] && zip_certificates
+    exit 0
 }
 
 function parse_arguments()
@@ -53,7 +54,7 @@ function parse_arguments()
         echo -e "No arguments were passed\n"
         _print_usage
     fi
-    while getopts ":hlri:c:s:e:x:z:p:" _opt; do
+    while getopts ":hlrvi:c:s:e:x:z:p:" _opt; do
         case $_opt in
             h )
                 _print_usage
@@ -64,6 +65,9 @@ function parse_arguments()
                 ;;
             r)
                 _flag_rootca=true
+                ;;
+            v)
+                _verbose=true
                 ;;
             i)
                 _validate_optarg $OPTARG
@@ -118,6 +122,7 @@ function _print_usage()
     echo "    -l                       List created intermediates"
     echo "                               - Use with -i <intermediate> to show leaf certificates"
     echo "    -r                       Create the rootca key and certificate"
+    echo "    -v                       Generate verbose output"
     echo "    -i <intermediate_name>   Create or use intermediate with given name"
     echo "                               - The name should be the same as the CN"
     echo "    -s <server_cert_name>    Create a server certificate with given name"
@@ -133,11 +138,11 @@ function _print_usage()
     echo "                               - Use with -i <intermediate> to only zip the public chain and stores"
     echo "                               - Use with -c or -s to include the keys and keystores"
     echo "    -p <password>            Password to be applied to ALL openssl and keytool commands"
-    echo "                               - This is not secure and only meant for testing purposes"
+    echo "                               - This is not secure and only meant for dev environment purposes"
     echo "                               - Removes all prompting from the user"
 }
 
-function _validate_optarg
+function _validate_optarg()
 {
     if [[ $1 == -* ]];then
         echo -e "Missing an argument\n"
@@ -164,6 +169,26 @@ function validate_arguments()
         return 1
     fi
     return 0
+}
+
+function maybe_log() {
+    if [[ ! -z $_verbose ]]; then
+        log "$1"
+    fi
+}
+
+function log() {
+    DT="$(date -u '+%H:%M:%S')"
+    echo "$DT [$_script_name] - $1"
+}
+
+function _execute_command() {
+    maybe_log "COMMAND: $1"
+    eval "$1"
+    if [[ $? -ne 0 ]]; then
+        log "ERROR: $2"
+        exit 1
+    fi
 }
 
 function print_intermediates()
@@ -206,7 +231,7 @@ function revoke_intermediate()
     _cleanup_intermediate_files
 }
 
-function _cleanup_intermediate_files
+function _cleanup_intermediate_files()
 {
     [[ -d $_intermediate_dir ]] && rm -rf $_intermediate_dir
     [[ -f $_pkcs12_truststore ]] && rm $_pkcs12_truststore
@@ -231,7 +256,7 @@ function revoke_leaf()
     _cleanup_leaf_files  
 }
 
-function _cleanup_leaf_files
+function _cleanup_leaf_files()
 {
     [[ -d $_leaf_dir ]] && rm -rf $_leaf_dir
     [[ -f $_pkcs12_keystore ]] && rm -f $_pkcs12_keystore
@@ -243,7 +268,7 @@ function create_rootca()
     _prepare_rootca_dirs
 
     [[ ! -f $_root_private_key ]] && _generate_key $_root_private_key
-    [[ ! -f $_root_public_cert ]] && _generate_rootca_cert 
+    [[ ! -f $_root_public_cert ]] && _generate_rootca_cert
 }
 
 function _prepare_rootca_dirs()
@@ -267,26 +292,47 @@ function _create_directories()
 
 function _generate_key()
 {
-    echo -e "Creating private key - $1"
+    local _file=$1
+    maybe_log "Creating private key: $_file"
+
+    if [[ -z $_store_password ]]; then
+        stty -echo
+        printf "Enter password for $(basename $_file): "
+        read _password
+        stty echo
+        printf "\n" 
+    else
+        _password=$_store_password
+    fi
+    local _openssl_pass_arg="-passout pass:$_password"
     
-    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-passout pass:$_store_password"
-    
-    openssl genrsa -aes256 -out $1 $_openssl_pass_arg 4096
-    chmod 400 $1
+    local _cmd="openssl genrsa -aes256 -out $_file $_openssl_pass_arg 4096 2>/dev/null"
+    _execute_command "$_cmd" "Failed to generate private key $_file"
+    chmod 400 $_file
 }
 
 function _generate_rootca_cert()
 {
-    echo -e "\nCreating public certificate - $_root_public_cert"
-    echo -e "Using cnf file: $_root_cnf_file"
-    echo -e "Using extension: $_root_extension"
+    maybe_log "Creating public certificate - $_root_public_cert"
+    maybe_log "Using cnf file: $ROOTCA_CNF_FILE"
+    maybe_log "Using extension: $_root_extension"
 
-    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
+    if [[ -z $_store_password ]]; then
+        stty -echo
+        printf "Enter password for $_root_private_key: "
+        read _password
+        stty echo
+        printf "\n" 
+    else
+        _password=$_store_password
+    fi
+    local _openssl_pass_arg="-batch -passin pass:$_password"
 
-    openssl req -config $ROOTCA_CNF_FILE -key $_root_private_key \
+    _cmd="openssl req -config $ROOTCA_CNF_FILE -key $_root_private_key \
         -new -x509 -days $_root_days_to_live -sha512 -extensions $_root_extension \
-        -out $_root_public_cert $_openssl_pass_arg
-    chmod 444 $_root_public_cert
+        -out $_root_public_cert $_openssl_pass_arg"
+    _execute_command "$_cmd" "Failed to generate public certificate for $_root_public_cert"
+    chmod 644 $_root_public_cert
 }
 
 function create_intermediate()
@@ -313,33 +359,54 @@ function _prepare_intermediate_dirs()
 
 function _generate_intermediate_csr()
 {
-    echo -e "\nCreating CSR - $_intermediate_csr_file"
-    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
+    maybe_log "Creating CSR $_intermediate_csr_file..."
+    maybe_log "Using cnf file: $INTERMEDIATE_CNF_FILE"
 
-    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
+    if [[ -z $_store_password ]]; then
+        stty -echo
+        printf "Enter password for $_intermediate_private_key: "
+        read _password
+        stty echo
+        printf "\n" 
+    else
+        _password=$_store_password
+    fi
+    local _openssl_pass_arg="-batch -passin pass:$_password"
     sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_intermediate_name," $INTERMEDIATE_CNF_FILE
     
-    openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
-        -key $_intermediate_private_key -out $_intermediate_csr_file $_openssl_pass_arg
+    _cmd="openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
+        -key $_intermediate_private_key -out $_intermediate_csr_file $_openssl_pass_arg 2>/dev/null"
+    _execute_command "$_cmd" "Failed to generate CSR $_intermediate_csr_file"
 }
 
-function _sign_intermediate_csr
+function _sign_intermediate_csr()
 {
-    echo -e "\nCreating signed certificate - $_intermediate_signed_cert"
-    echo -e "Using CSR: $_intermediate_csr_file"
-    echo -e "Using cnf file: $ROOTCA_CNF_FILE"
-    echo -e "Using extension: $_intermediate_extension"
+    maybe_log "Creating signed certificate - $_intermediate_signed_cert..."
+    maybe_log "Using CSR: $_intermediate_csr_file"
+    maybe_log "Using cnf file: $ROOTCA_CNF_FILE"
+    maybe_log "Using extension: $_intermediate_extension"
 
-    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
+    if [[ -z $_store_password ]]; then
+        stty -echo
+        printf "Enter password for $_intermediate_private_key: "
+        read _password
+        stty echo
+        printf "\n" 
+    else
+        _password=$_store_password
+    fi
+    local _openssl_pass_arg="-batch -passin pass:$_password"
 
-    openssl ca -config $ROOTCA_CNF_FILE -extensions $_intermediate_extension \
+    _cmd="openssl ca -config $ROOTCA_CNF_FILE -extensions $_intermediate_extension \
         -days $_intermediate_days_to_live -notext -md sha512 \
-        -in $_intermediate_csr_file -out $_intermediate_signed_cert $_openssl_pass_arg
+        -in $_intermediate_csr_file -out $_intermediate_signed_cert $_openssl_pass_arg 2>/dev/null"
+    _execute_command "$_cmd" "Failed to sign intermediate certificate using $_intermediate_csr_file"
     chmod 444 $_intermediate_signed_cert
 }
 
-function _create_intermediate_chain
+function _create_intermediate_chain()
 {
+    maybe_log "Generating $_intermediate_chain..."
     cat $_intermediate_signed_cert $_root_public_cert > $_intermediate_chain
     chmod 444 $_intermediate_chain
 }
@@ -353,40 +420,60 @@ function create_leaf()
     [[ ! -f $_leaf_signed_cert ]] && _sign_leaf_csr
 }
 
-function _prepare_leaf_dirs
+function _prepare_leaf_dirs()
 {
     _create_directories "$_leaf_dirs_list"
     chmod 700 $_leaf_private_key_dir
 }
 
-function _generate_leaf_csr
+function _generate_leaf_csr()
 {
-    echo -e "\nCreating CSR - $_leaf_csr_file"
-    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
+    maybe_log "Creating CSR $_leaf_csr_file..."
+    maybe_log "Using cnf file: $INTERMEDIATE_CNF_FILE"
 
+    if [[ -z $_store_password ]]; then
+        stty -echo
+        printf "Enter password for $_intermediate_private_key: "
+        read _password
+        stty echo
+        printf "\n" 
+    else
+        _password=$_store_password
+    fi
+    local _openssl_pass_arg="-batch -passin pass:$_password"
     sed -i .orig -e "s%\(^subjectAltName *=\).*%\1 $_store_san_extensions%" $INTERMEDIATE_CNF_FILE
-    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
     [[ ! -z $_store_san_extensions ]] && _request_san_extension="-reqexts SAN"
     sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_leaf_certificate_name," $INTERMEDIATE_CNF_FILE
 
-    openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
+    _cmd="openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
         -key $_leaf_private_key -out $_leaf_csr_file \
-        $_request_san_extension $_openssl_pass_arg
+        $_request_san_extension $_openssl_pass_arg 2>/dev/null"
+    _execute_command "$_cmd" "Failed to generate CSR $_leaf_csr_file"
 }
 
-function _sign_leaf_csr
+function _sign_leaf_csr()
 {
-    echo -e "\nCreating signed certificate - $_leaf_signed_cert"
-    echo -e "Using intermediate - $_store_intermediate_name"
-    echo -e "Using CSR: $_leaf_csr_file"
-    echo -e "Using cnf file: $INTERMEDIATE_CNF_FILE"
-    echo -e "Using extension: $_leaf_certificate_type"
+    maybe_log "Creating signed certificate $_leaf_signed_cert..."
+    maybe_log "Using intermediate: $_store_intermediate_name"
+    maybe_log "Using CSR: $_leaf_csr_file"
+    maybe_log "Using cnf file: $INTERMEDIATE_CNF_FILE"
+    maybe_log "Using extension: $_leaf_certificate_type"
     
-    [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
+    if [[ -z $_store_password ]]; then
+        stty -echo
+        printf "Enter password for $_intermediate_private_key: "
+        read _password
+        stty echo
+        printf "\n" 
+    else
+        _password=$_store_password
+    fi
+    local _openssl_pass_arg="-batch -passin pass:$_password"
 
-    openssl ca -config $INTERMEDIATE_CNF_FILE -extensions $_leaf_certificate_type \
+    _cmd="openssl ca -config $INTERMEDIATE_CNF_FILE -extensions $_leaf_certificate_type \
         -days $_leaf_days_to_live -notext -md sha512 \
-        -in $_leaf_csr_file -out $_leaf_signed_cert $_openssl_pass_arg
+        -in $_leaf_csr_file -out $_leaf_signed_cert $_openssl_pass_arg 2>/dev/null"
+    _execute_command "$_cmd" "Failed to sign leaf certificate using $_leaf_csr_file"
     chmod 444 $_leaf_signed_cert
 }
 
@@ -399,28 +486,54 @@ function create_truststores()
 # Due to a limitation of not being able to add OID 2.16.840.1.113894.746875.1.1 to the PKCS12 store, Java cannot read the certs
 #   - https://github.com/openssl/openssl/issues/6684
 # As a result, we must convert the JKS file to PKCS12, we cannot use openssl to generate the PKCS12 truststore
-function _generate_pfx_truststore
+function _generate_pfx_truststore()
 {
-    echo -e "\nCreating PKCS12 Truststore: $_pkcs12_truststore"
-    [[ ! -z $_store_password ]] && local _keytool_pass_arg="-srcstorepass $_store_password -deststorepass $_store_password"
+    maybe_log "Creating PKCS12 Truststore: $_pkcs12_truststore..."
+    
+    if [[ -z $_store_password ]]; then
+        stty -echo
+        printf "Enter password for $_jks_truststore: "
+        read _jks_password
+        printf "\n"
+        printf "Enter password for $_pkcs12_truststore: "
+        read _pfx_password
+        stty echo
+        printf "\n"
+    else
+        _jks_password=$_store_password
+        _pfx_password=$_store_password
+    fi
+    local _keytool_pass_arg="-srcstorepass $_jks_password -deststorepass $_pfx_password"
 
-    keytool -importkeystore -srckeystore $_jks_truststore -destkeystore $_pkcs12_truststore -deststoretype PKCS12 $_keytool_pass_arg
+    _cmd="keytool -importkeystore -srckeystore $_jks_truststore -destkeystore $_pkcs12_truststore -deststoretype PKCS12 $_keytool_pass_arg 2>/dev/null"
+    _execute_command "$_cmd" "Failed to generate truststore $_pkcs12_truststore from $_jks_truststore"
     chmod 644 $_pkcs12_truststore
 }
 
-function _generate_jks_truststore
+function _generate_jks_truststore()
 {
-    echo -e "\nCreating JKS Truststore: $_jks_truststore"
+    maybe_log "Creating JKS Truststore: $_jks_truststore..."
 
-    [[ ! -z $_store_password ]] && local _keytool_pass_arg="-storepass $_store_password"
+    if [[ -z $_store_password ]]; then
+        stty -echo
+        printf "Enter password for $_jks_truststore: "
+        read _password
+        stty echo
+        printf "\n" 
+    else
+        _password=$_store_password
+    fi
+    local _keytool_pass_arg="-storepass $_password"
 
-    echo -e "Importing rootca - $_root_public_cert"
-    keytool -importcert -noprompt -alias rootca -keystore $_jks_truststore \
-        -file $_root_public_cert $_keytool_pass_arg
+    maybe_log "Importing rootca: $_root_public_cert..."
+    _cmd="keytool -importcert -noprompt -alias rootca -keystore $_jks_truststore \
+        -file $_root_public_cert $_keytool_pass_arg 2>/dev/null"
+    _execute_command "$_cmd" "Failed to import $_root_public_cert into $_jks_truststore"
 
-    echo -e "Importing intermediate - $_intermediate_signed_cert"
-    keytool -importcert -noprompt -alias $_store_intermediate_name $_keytool_pass_arg \
-        -keystore $_jks_truststore -file $_intermediate_signed_cert 
+    maybe_log "Importing intermediate: $_intermediate_signed_cert..."
+    _cmd="keytool -importcert -noprompt -alias $_store_intermediate_name $_keytool_pass_arg \
+        -keystore $_jks_truststore -file $_intermediate_signed_cert 2>/dev/null"
+    _execute_command "$_cmd" "Failed to import $_intermediate_signed_cert into $_jks_truststore"
     chmod 644 $_jks_truststore
 }
 
@@ -430,31 +543,57 @@ function create_keystores()
     [[ ! -f $_jks_keystore ]] && _generate_jks_keystore
 }
 
-function _generate_pfx_keystore
+function _generate_pfx_keystore()
 {
-    echo -e "\nCreating PKCS12 Keystore: $_pkcs12_keystore"
+    maybe_log "Creating PKCS12 Keystore: $_pkcs12_keystore..."
 
-    [[ ! -z $_store_password ]] && \
-        local _openssl_pass_arg="-passin pass:$_store_password -passout pass:$_store_password"
+    if [[ -z $_store_password ]]; then
+        stty -echo
+        printf "Enter password for $_leaf_private_key: "
+        read _pem_password
+        printf "\n"
+        printf "Enter password for $_pkcs12_keystore: "
+        read _pfx_password
+        stty echo
+        printf "\n" 
+    else
+        _pem_password=$_store_password
+        _pfx_password=$_store_password
+    fi
+    local _openssl_pass_arg="-passin pass:$_pem_password -passout pass:$_pfx_password"
 
-    openssl pkcs12 -export -inkey $_leaf_private_key -in $_leaf_signed_cert \
-        -certfile $_intermediate_chain -out $_pkcs12_keystore $_openssl_pass_arg
+    _cmd="openssl pkcs12 -export -inkey $_leaf_private_key -in $_leaf_signed_cert \
+        -certfile $_intermediate_chain -out $_pkcs12_keystore $_openssl_pass_arg"
+    _execute_command "$_cmd" "failed to generate $_pkcs12_keystore"
     chmod 400 $_pkcs12_keystore
 }
 
-function _generate_jks_keystore
+function _generate_jks_keystore()
 {
-    echo -e "\nCreating JKS Keystore: $_jks_keystore"
+    maybe_log "Creating JKS Keystore: $_jks_keystore..."
     
-    [[ ! -z $_store_password ]] && \
-        local _keytool_pass_arg="-srcstorepass $_store_password -deststorepass $_store_password"
+    if [[ -z $_store_password ]]; then
+        stty -echo
+        printf "Enter password for $_pkcs12_keystore: "
+        read _pfx_password
+        printf "\n"
+        printf "Enter password for $_jks_keystore: "
+        read _jks_password
+        stty echo
+        printf "\n" 
+    else
+        _pfx_password=$_store_password
+        _jks_password=$_store_password
+    fi
+    local _keytool_pass_arg="-srcstorepass $_pfx_password -deststorepass $_jks_password"
    
-    keytool -importkeystore -srckeystore $_pkcs12_keystore -srcstoretype PKCS12 \
-        -destkeystore $_jks_keystore -deststoretype JKS $_keytool_pass_arg
+    _cmd="keytool -importkeystore -srckeystore $_pkcs12_keystore -srcstoretype PKCS12 \
+        -destkeystore $_jks_keystore -deststoretype JKS $_keytool_pass_arg 2>/dev/null"
+    _execute_command "$_cmd" "Failed to generate $_jks_keystore"
     chmod 400 $_jks_keystore
 }
 
-function zip_certificates
+function zip_certificates()
 {
     [[ ! -z $_store_intermediate_name ]] && _tar_truststores
     [[ ! -z $_store_leaf_certificate_name ]] && _tar_keystores
@@ -462,7 +601,7 @@ function zip_certificates
     gzip $_store_zip_name
 }
 
-function _tar_truststores
+function _tar_truststores()
 {
     [[ -f $_intermediate_chain ]] && tar -cPf $_store_zip_name \
         -C $(dirname $_intermediate_chain) $(basename $_intermediate_chain)
@@ -472,7 +611,7 @@ function _tar_truststores
         -C $(dirname $_jks_truststore) $(basename $_jks_truststore)
 }
 
-function _tar_keystores
+function _tar_keystores()
 {
     [[ -f $_leaf_private_key ]] && tar -rPf $_store_zip_name \
         -C $(dirname $_leaf_private_key) $(basename $_leaf_private_key)
@@ -484,4 +623,5 @@ function _tar_keystores
         -C $(dirname $_jks_keystore) $(basename $_jks_keystore)
 }
 
+_script_name=$(basename $0)
 main "$@"

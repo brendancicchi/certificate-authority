@@ -47,7 +47,7 @@ function setup_scenario {
     _node_ip=($(echo "$_ctool_info" | grep 'public hostname' | head -n 1 | cut -d ' ' -f3))
     _node_host=($(echo "$_ctool_info" | grep 'private hostname' | head -n 1 | cut -d ' ' -f3))
     _sans="IP:$_node_ip,DNS:$_node_host"
-    $CA -i $CLUSTER_NAME -p $PASSWORD -s $_scenario -e $_sans -z $TMP/$_scenario &> /dev/null
+    $CA -i $CLUSTER_NAME -p $PASSWORD -s $_scenario -e $_sans -z $TMP/$_scenario
     eval "$CTOOL scp $CLUSTER_NAME 0 $TMP/$_scenario.tar.gz /home/automaton/"
     rm -rf $TMP
     eval "$CTOOL run $CLUSTER_NAME 0 \"\
