@@ -20,7 +20,7 @@ DSE_VERSION="6.8.9"
 export CA="$(dirname $(echo "$(cd "$(dirname "$0")"; pwd)/$(basename "$0")"))/../certificate-authority.sh" # https://stackoverflow.com/a/3915420/10156762
 _script_path="$(dirname $0)"
 _script_name="$(basename $0)"
-_cassandra_yaml_path="/etc/dse/cassandra/cassandra.yaml"
+ctool_deploy_certs="$_script_path/../integrations/ctool-deploy-certs.sh"
 _scenario_num=
 _tear_down_env=
 
@@ -43,7 +43,7 @@ function main()
 
 function parse_arguments()
 {
-    while getopts ":hs:x" _opt; do
+    while getopts ":hs:vx" _opt; do
         case $_opt in
             h )
                 _print_usage
@@ -52,6 +52,10 @@ function parse_arguments()
             s )
                 _validate_optarg $OPTARG
                 _scenario_num="$OPTARG"
+                ;;
+            v )
+                export CA="$CA -v"
+                ctool_deploy_certs="$ctool_deploy_certs -v"
                 ;;
             x )
                 _tear_down_env="true"
@@ -75,6 +79,7 @@ function _print_usage()
     echo "Usage:"
     echo "    -h                        Display this help message."
     echo "    -s <number>               Scenario to run"
+    echo "    -v                        Generate verbose output"
     echo "    -x                        Destroy training environment"
 }
 
@@ -122,7 +127,7 @@ function setup_cluster()
     fi
     if ! eval "$CTOOL run $CLUSTER_NAME 0 'ls -1 | grep -w node.tar.gz' > /dev/null"; then
         log "Performing initial SSL configuration for training..."
-        $_script_path/../integrations/ctool-deploy-certs.sh -aoc $CLUSTER_NAME -t $TMP
+        $ctool_deploy_certs -aoc $CLUSTER_NAME -t $TMP
         log "SSL configuration complete"
     else
         log "Cluster has already been configured for SSL"
@@ -159,7 +164,7 @@ function tear_down_environment()
   log "Destroying $PROVIDER instances..."
   eval "$CTOOL destroy $CLUSTER_NAME > /dev/null"
   log "Cleaning up certificate authority entries..."
-  $CA -x $CLUSTER_NAME -p $PASSWORD &> /dev/null
+  $CA -x $CLUSTER_NAME -p $PASSWORD
   log "Environment has been torn down."
 }
 

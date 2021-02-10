@@ -45,7 +45,7 @@ function parse_arguments()
     _optional_ssl=
     _restart_nodes=
     _tmp_dir="/tmp"
-    while getopts ":ac:hort:" _opt; do
+    while getopts ":ac:hort:v" _opt; do
       case $_opt in
         a )
           _require_client_auth=true
@@ -67,6 +67,9 @@ function parse_arguments()
         t)
           _validate_optarg $OPTARG
           _tmp_dir="$OPTARG"
+          ;;
+        v)
+          CA="$CA -v"
           ;;
         \?)
           echo -e "Invalid option: -$OPTARG\n"
@@ -105,6 +108,7 @@ function _print_usage()
     echo "    -o                       Allow optional client connections"
     echo "    -r                       Restart the nodes in parallel"
     echo "    -t <tmp_dir>             Directory to store temporary files (Default: /tmp)"
+    echo "    -v                       Generate verbose output"
 }
 
 function log {
@@ -119,7 +123,7 @@ function _generate_dse_certificates()
     _cn="node"$i
     _sans="IP:${_node_ips_array[i]},DNS:${_node_hosts_array[i]}"
     [[ -f $_tmp_dir/$_cluster_name-$_cn.tar.gz ]] && rm $_tmp_dir/$_cluster_name-$_cn.tar.gz
-    $CA -r -i $_cluster_name -s $_cn -e $_sans -z $_tmp_dir/$_cluster_name-$_cn -p $PASSWORD &> /dev/null
+    $CA -r -i $_cluster_name -s $_cn -e $_sans -z $_tmp_dir/$_cluster_name-$_cn -p $PASSWORD
     eval "$CTOOL scp $_cluster_name $i $_tmp_dir/$_cluster_name-$_cn.tar.gz /home/automaton/node.tar.gz > /dev/null"
     rm $_tmp_dir/$_cluster_name-$_cn.tar.gz
   done
@@ -132,7 +136,7 @@ function _generate_cqlsh_certificates()
     _cn="cqlsh"$i
     _sans="IP:${_node_ips_array[i]},DNS:${_node_hosts_array[i]}"
     [[ -f $_tmp_dir/$_cluster_name-$_cn.tar.gz ]] && rm $_tmp_dir/$_cluster_name-$_cn.tar.gz
-    $CA -r -i $_cluster_name -c $_cn -e $_sans -z $_tmp_dir/$_cluster_name-$_cn -p $PASSWORD &> /dev/null
+    $CA -r -i $_cluster_name -c $_cn -e $_sans -z $_tmp_dir/$_cluster_name-$_cn -p $PASSWORD
     eval "$CTOOL scp $_cluster_name $i $_tmp_dir/$_cluster_name-$_cn.tar.gz /home/automaton/cqlsh.tar.gz"
     rm $_tmp_dir/$_cluster_name-$_cn.tar.gz
   done

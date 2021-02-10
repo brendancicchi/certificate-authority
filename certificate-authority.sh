@@ -505,7 +505,7 @@ function _generate_pfx_truststore()
     fi
     local _keytool_pass_arg="-srcstorepass $_jks_password -deststorepass $_pfx_password"
 
-    _cmd="keytool -importkeystore -srckeystore $_jks_truststore -destkeystore $_pkcs12_truststore -deststoretype PKCS12 $_keytool_pass_arg"
+    _cmd="keytool -importkeystore -srckeystore $_jks_truststore -destkeystore $_pkcs12_truststore -deststoretype PKCS12 $_keytool_pass_arg 2>/dev/null"
     _execute_command "$_cmd" "Failed to generate truststore $_pkcs12_truststore from $_jks_truststore"
     chmod 644 $_pkcs12_truststore
 }
@@ -527,12 +527,12 @@ function _generate_jks_truststore()
 
     maybe_log "Importing rootca: $_root_public_cert..."
     _cmd="keytool -importcert -noprompt -alias rootca -keystore $_jks_truststore \
-        -file $_root_public_cert $_keytool_pass_arg"
+        -file $_root_public_cert $_keytool_pass_arg 2>/dev/null"
     _execute_command "$_cmd" "Failed to import $_root_public_cert into $_jks_truststore"
 
     maybe_log "Importing intermediate: $_intermediate_signed_cert..."
     _cmd="keytool -importcert -noprompt -alias $_store_intermediate_name $_keytool_pass_arg \
-        -keystore $_jks_truststore -file $_intermediate_signed_cert"
+        -keystore $_jks_truststore -file $_intermediate_signed_cert 2>/dev/null"
     _execute_command "$_cmd" "Failed to import $_intermediate_signed_cert into $_jks_truststore"
     chmod 644 $_jks_truststore
 }
@@ -588,7 +588,7 @@ function _generate_jks_keystore()
     local _keytool_pass_arg="-srcstorepass $_pfx_password -deststorepass $_jks_password"
    
     _cmd="keytool -importkeystore -srckeystore $_pkcs12_keystore -srcstoretype PKCS12 \
-        -destkeystore $_jks_keystore -deststoretype JKS $_keytool_pass_arg"
+        -destkeystore $_jks_keystore -deststoretype JKS $_keytool_pass_arg 2>/dev/null"
     _execute_command "$_cmd" "Failed to generate $_jks_keystore"
     chmod 400 $_jks_keystore
 }
