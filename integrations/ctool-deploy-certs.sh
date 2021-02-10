@@ -111,6 +111,12 @@ function _print_usage()
     echo "    -v                       Generate verbose output"
 }
 
+function maybe_log() {
+    if [[ ! -z $_verbose ]]; then
+        log "$1"
+    fi
+}
+
 function log {
     DT="$(date -u '+%H:%M:%S')"
     echo "$DT [$_script_name] - $1"
