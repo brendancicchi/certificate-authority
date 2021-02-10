@@ -4,10 +4,6 @@ NOTE: Please be sure to actually make an attempt at the scenario as this is mean
 
 ---------------
 
-## Overview
-
-This is a missing SAN (Subject Alternative Name) entry issue causing the handshake failure with `require_endpoint_verification: true`.
-
 ## Identification
 
 On `node1`, there is an error similar to the following:
@@ -34,6 +30,9 @@ SubjectAlternativeName [
 ]
 ```
 
+## Summary
+
+This is a missing SAN (Subject Alternative Name) entry issue causing the handshake failure with `require_endpoint_verification: true`.
 
 ## Resolution
 

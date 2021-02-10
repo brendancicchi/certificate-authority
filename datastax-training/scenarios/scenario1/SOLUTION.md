@@ -4,10 +4,6 @@ NOTE: Please be sure to actually make an attempt at the scenario as this is mean
 
 ---------------
 
-## Overview
-
-The root of the issue here is that the certificate chain for the keystore is incomplete. The result is that trust cannot be established based on the intermediate. This is a rather common issue that is seen in Support and generally will happen when a customer uses openssl to build the keystore as you need to explicitly specify the chain PEMs when building the PKCS12 file.
-
 ## Identification
 
 The incomplete chain can be seen via `keytool`:
@@ -30,6 +26,9 @@ Issuer: CN=datastax-ssl-training, OU=Support, O=DataStax, ST=CA, C=US
 
 Notice that the `PrivateKeyEntry` was issued by `CN=datastax-ssl-training, OU=Support, O=DataStax, ST=CA, C=US` but the chain length shows as **1**. To further validate, we see the truststore only contains the certificates
 
+## Summary
+
+The root of the issue here is that the certificate chain for the keystore is incomplete. The result is that trust cannot be established based on the intermediate. This is a rather common issue that is seen in Support and generally will happen when a customer uses openssl to build the keystore as you need to explicitly specify the chain PEMs when building the PKCS12 file.
 
 ## Resolution
 
