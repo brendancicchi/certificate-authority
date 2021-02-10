@@ -45,6 +45,7 @@ function parse_arguments()
     _optional_ssl=false
     _restart_nodes=
     _tmp_dir="/tmp"
+    _verbose=
     while getopts ":ac:hort:v" _opt; do
       case $_opt in
         a )
@@ -70,6 +71,7 @@ function parse_arguments()
           ;;
         v)
           CA="$CA -v"
+          _verbose=true
           ;;
         \?)
           echo -e "Invalid option: -$OPTARG\n"
