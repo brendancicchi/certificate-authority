@@ -222,10 +222,20 @@ function revoke_intermediate()
             | grep "$_store_revoke_name" | cut -f4)
         if [[ ! -z $_intermediate_id ]]; then
             local _cert_to_revoke="${_root_new_certs_dir}/${_intermediate_id}.pem"
-            [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
-            openssl ca -revoke $_cert_to_revoke -config $ROOTCA_CNF_FILE $_openssl_pass_arg
+            if [[ -z $_store_password ]]; then
+                stty -echo
+                printf "Enter password for $(basename $_file): "
+                read _password
+                stty echo
+                printf "\n" 
+            else
+                _password=$_store_password
+            fi
+            local _openssl_pass_arg="-passin pass:$_password"
+            _cmd="openssl ca -revoke $_cert_to_revoke -config $ROOTCA_CNF_FILE $_openssl_pass_arg 2>/dev/null"
+            _execute_command "$_cmd" "Failed to revoke $_cert_to_revoke using $ROOTCA_CNF_FILE"
         else
-            echo "There is no intermediate certificate $_store_revoke_name to be revoked."
+            log "There is no intermediate certificate $_store_revoke_name to be revoked."
         fi
     fi
     _cleanup_intermediate_files
@@ -245,13 +255,24 @@ function revoke_leaf()
             | grep "$_store_revoke_name" | cut -f4)
         if [[ ! -z $_leaf_id ]]; then
             local _cert_to_revoke="${_intermediate_new_certs_dir}/${_leaf_id}.pem"
-            [[ ! -z $_store_password ]] && local _openssl_pass_arg="-batch -passin pass:$_store_password"
-            openssl ca -revoke $_cert_to_revoke -config $INTERMEDIATE_CNF_FILE $_openssl_pass_arg
+            if [[ -z $_store_password ]]; then
+                stty -echo
+                printf "Enter password for $(basename $_file): "
+                read _password
+                stty echo
+                printf "\n" 
+            else
+                _password=$_store_password
+            fi
+            local _openssl_pass_arg="-passin pass:$_password"
+
+            _cmd="openssl ca -revoke $_cert_to_revoke -config $INTERMEDIATE_CNF_FILE $_openssl_pass_arg 2>/dev/null"
+            _execute_command "$_cmd" "Failed to revoke $_cert_to_revoke using $INTERMEDIATE_CNF_FILE"
         else
-            echo "There is no leaf certificate $_store_revoke_name to be revoked."
+            log "There is no leaf certificate $_store_revoke_name to be revoked."
         fi
     else
-        echo "There is no intermediate named $_store_intermediate_name."
+        log "There is no intermediate named $_store_intermediate_name."
     fi
     _cleanup_leaf_files  
 }
