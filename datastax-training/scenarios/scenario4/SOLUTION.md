@@ -4,10 +4,6 @@ NOTE: Please be sure to actually make an attempt at the scenario as this is mean
 
 ---------------
 
-## Overview
-
-There is no PrivateKeyEntry in the keystore in use by the node.
-
 ## Identification
 
 On `node0`, there is an error similar to the following:
@@ -46,6 +42,9 @@ datastax-ssl-training, Feb 8, 2021, trustedCertEntry,
 Certificate fingerprint (SHA1): 4E:AB:C7:FD:DC:6D:6E:66:A3:2E:8E:7A:00:65:3F:7F:98:84:2D:F7
 ```
 
+## Summary
+
+There is no PrivateKeyEntry in the keystore in use by the node, so the keystore is invalid.
 
 ## Resolution
 

@@ -4,10 +4,6 @@ NOTE: Please be sure to actually make an attempt at the scenario as this is mean
 
 ---------------
 
-## Overview
-
-This is a pretty typical cipher suite incompatibility issue. The ciphers listed on `node0` are actually all restricted by the JVM and thus rejected. These are all older ciphers introduced in `TLSv1` and use a `SHA1` hash.
-
 ## Identification
 
 Error message from log:
@@ -86,6 +82,10 @@ jdk.tls.disabledAlgorithms=SHA1, SSLv3, RC4, DES, MD5withRSA, DH keySize < 1024,
 ```
 
 We do see that all `SHA1` ciphers are disabled on the socket, and since all the ciphers in `node0`'s allow list are `SHA1`, this is why they all fail.
+
+## Summary
+
+This is a pretty typical cipher suite incompatibility issue. The ciphers listed on `node0` are actually all restricted by the JVM and thus rejected. These are all older ciphers introduced in `TLSv1` and use a `SHA1` hash.
 
 ## Resolution
 
