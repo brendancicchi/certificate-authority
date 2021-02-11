@@ -42,8 +42,9 @@ certificate-authority -x {CLUSTER_NAME} -p {PASSWORD}
 
 ## Scenarios
 
-The **Solution** links contain spoilers. Please attempt to correct the scenario yourself before viewing the solution.
+The **Solution** links contain spoilers. Please attempt to correct the scenario yourself before viewing any solutions. Scenarios are independent of each other so you can move onto the next scenario and redeploy a scenario later even without solving it. DSE must be in a configuration that allows it to start prior to any scenario deployments. 
 
 * Scenario 1 - `./run-scenario.sh -s 1` -> [Solution](scenarios/scenario1/SOLUTION.md)
 * Scenario 2 - `./run-scenario.sh -s 2` -> [Solution](scenarios/scenario2/SOLUTION.md)
 * Scenario 3 - `./run-scenario.sh -s 3` -> [Solution](scenarios/scenario3/SOLUTION.md)
+* Scenario 4 - `./run-scenario.sh -s 4` -> [Solution](scenarios/scenario4/SOLUTION.md)

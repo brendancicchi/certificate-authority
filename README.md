@@ -1,7 +1,15 @@
 # certificate-authority README
 
 ### Setup
-To run the *certificate-authority.sh* script, copy the _resources/*.cnf files_ to the desired location in your file system.
+
+Clone this repository locally:
+
+```
+git clone https://github.com/brendancicchi/certificate-authority.git
+```
+
+Copy the _resources/*.cnf files_ to a desired location in your file system.
+
 Configure the _CAPS-LOCKED_ variables at the top of the _conf/ssl-var-configurations.sh_ as seen below:
 
 ```bash
