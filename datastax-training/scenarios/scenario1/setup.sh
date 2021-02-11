@@ -55,7 +55,7 @@ function setup_scenario {
       -out $TMP/$_scenario.p12 -password pass:$PASSWORD
     keytool -importkeystore -srckeystore $TMP/$_scenario.p12 -srcstoretype PKCS12 -srcstorepass $PASSWORD \
       -destkeystore $TMP/$_scenario.jks -deststoretype JKS -deststorepass $PASSWORD 2> /dev/null
-    tar -czPf $TMP/$_scenario.tar.gz -C $TMP $_scenario.jks datastax-ssl-training-truststore.jks
+    tar -czPf $TMP/$_scenario.tar.gz -C $TMP $_scenario.jks datastax-ssl-training-truststore.jks $CLUSTER_NAME.cert.pem ca.cert.pem
     eval "$CTOOL scp $CLUSTER_NAME 0 $TMP/$_scenario.tar.gz /home/automaton"
     rm -rf $TMP
     eval "$CTOOL run $CLUSTER_NAME 0 \"\

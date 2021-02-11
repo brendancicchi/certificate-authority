@@ -215,16 +215,14 @@ function _configure_dse_nodes()
 function _configure_cqlsh()
 {
   log "Configuring cqlshrc for automaton..."
-  _cqlshrc="[ssl]
-validate = true
-certfile=/etc/dse/security/ca-$_cluster_name-chain.certs.pem"
+  _cqlshrc="[ssl]\nvalidate = true\ncertfile=/etc/dse/security/ca.cert.pem"
   if [ ! -z $_require_client_auth ]; then
     _generate_cqlsh_certificates
     _cmd="$CTOOL run $_cluster_name all \"mkdir -p /home/automaton/.cassandra/certs/ && \
     tar -xf /home/automaton/cqlsh.tar.gz -C /home/automaton/.cassandra/certs/ && \
-    openssl rsa -in /home/automaton/.cassandra/certs/*.key.pem -passin pass:$PASSWORD -out /home/automaton/.cassandra/certs/cqlsh.key && \
+    openssl rsa -in /home/automaton/.cassandra/certs/cqlsh*.key.pem -passin pass:$PASSWORD -out /home/automaton/.cassandra/certs/cqlsh.key && \
     chmod 600 /home/automaton/.cassandra/certs/cqlsh.key && \
-    cat /home/automaton/.cassandra/certs/*.cert.pem /home/automaton/.cassandra/certs/*chain.certs.pem >| /home/automaton/.cassandra/certs/cqlsh.chain.pem\" \
+    cat /home/automaton/.cassandra/certs/cqlsh*.cert.pem /home/automaton/.cassandra/certs/$_cluster_name.cert.pem >| /home/automaton/.cassandra/certs/cqlsh.chain.pem\" \
     > /dev/null"
     _execute_command "$_cmd" "Failed to extract CQLSH certificates in $_cluster_name"
     _cqlshrc=$(echo -e "$_cqlshrc\nuserkey=/home/automaton/.cassandra/certs/cqlsh.key\nusercert=/home/automaton/.cassandra/certs/cqlsh.chain.pem")

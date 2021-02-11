@@ -342,7 +342,6 @@ function create_intermediate()
     [[ ! -f $_intermediate_private_key ]] && _generate_key $_intermediate_private_key
     [[ ! -f $_intermediate_csr_file ]] && _generate_intermediate_csr
     [[ ! -f $_intermediate_signed_cert ]] && _sign_intermediate_csr
-    [[ ! -f $_intermediate_chain ]] && _create_intermediate_chain
 }
 
 function _prepare_intermediate_dirs()
@@ -402,13 +401,6 @@ function _sign_intermediate_csr()
         -in $_intermediate_csr_file -out $_intermediate_signed_cert $_openssl_pass_arg 2>/dev/null"
     _execute_command "$_cmd" "Failed to sign intermediate certificate using $_intermediate_csr_file"
     chmod 444 $_intermediate_signed_cert
-}
-
-function _create_intermediate_chain()
-{
-    maybe_log "Generating $_intermediate_chain..."
-    cat $_intermediate_signed_cert $_root_public_cert > $_intermediate_chain
-    chmod 444 $_intermediate_chain
 }
 
 function create_leaf()
@@ -529,11 +521,6 @@ function _generate_jks_truststore()
     _cmd="keytool -importcert -noprompt -alias rootca -keystore $_jks_truststore \
         -file $_root_public_cert $_keytool_pass_arg 2>/dev/null"
     _execute_command "$_cmd" "Failed to import $_root_public_cert into $_jks_truststore"
-
-    maybe_log "Importing intermediate: $_intermediate_signed_cert..."
-    _cmd="keytool -importcert -noprompt -alias $_store_intermediate_name $_keytool_pass_arg \
-        -keystore $_jks_truststore -file $_intermediate_signed_cert 2>/dev/null"
-    _execute_command "$_cmd" "Failed to import $_intermediate_signed_cert into $_jks_truststore"
     chmod 644 $_jks_truststore
 }
 
@@ -563,7 +550,7 @@ function _generate_pfx_keystore()
     local _openssl_pass_arg="-passin pass:$_pem_password -passout pass:$_pfx_password"
 
     _cmd="openssl pkcs12 -export -inkey $_leaf_private_key -in $_leaf_signed_cert \
-        -certfile $_intermediate_chain -out $_pkcs12_keystore $_openssl_pass_arg"
+        -certfile $_intermediate_signed_cert -out $_pkcs12_keystore $_openssl_pass_arg"
     _execute_command "$_cmd" "failed to generate $_pkcs12_keystore"
     chmod 400 $_pkcs12_keystore
 }
@@ -603,8 +590,10 @@ function zip_certificates()
 
 function _tar_truststores()
 {
-    [[ -f $_intermediate_chain ]] && tar -cPf $_store_zip_name \
-        -C $(dirname $_intermediate_chain) $(basename $_intermediate_chain)
+    [[ -f $_intermediate_signed_cert ]] && tar -cPf $_store_zip_name \
+        -C $(dirname $_intermediate_signed_cert) $(basename $_intermediate_signed_cert)
+    [[ -f $_root_public_cert ]] && tar -rPf $_store_zip_name \
+        -C $(dirname $_root_public_cert) $(basename $_root_public_cert)
     [[ -f $_pkcs12_truststore ]] && tar -rPf $_store_zip_name \
         -C $(dirname $_pkcs12_truststore) $(basename $_pkcs12_truststore)
     [[ -f $_jks_truststore ]] && tar -rPf $_store_zip_name \

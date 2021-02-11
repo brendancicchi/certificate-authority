@@ -159,7 +159,7 @@ function setup_cluster()
     log "Validating nodes have started..."
     _cmd="_return_codes_output=\$($CTOOL run $CLUSTER_NAME all 'ps -ef | grep DseModule | grep -v grep' | grep 'Return Code:' | cut -d ' ' -f3)"
     _execute_command "$_cmd" "Failed to get the return codes from ps output"
-    if echo $_return_codes_output | grep -w "1"; then
+    if echo $_return_codes_output | grep -w "1" > /dev/null; then
         start_node "all"
     fi
 }
