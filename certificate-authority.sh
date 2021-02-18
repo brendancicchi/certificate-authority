@@ -54,7 +54,7 @@ function parse_arguments()
         echo -e "No arguments were passed\n"
         _print_usage
     fi
-    while getopts ":hlrvi:c:s:e:x:z:p:" _opt; do
+    while getopts ":hlrvi:c:s:e:x:z:p:t:" _opt; do
         case $_opt in
             h )
                 _print_usage
@@ -101,6 +101,10 @@ function parse_arguments()
                 _validate_optarg $OPTARG
                 _store_password="$OPTARG"
                 ;;
+            t)
+                _validate_optarg $OPTARG
+                _time_to_live="$OPTARG"
+                ;;
             \?)
                 echo -e "Invalid option: -$OPTARG\n"
                 _print_usage
@@ -140,12 +144,13 @@ function _print_usage()
     echo "    -p <password>            Password to be applied to ALL openssl and keytool commands"
     echo "                               - This is not secure and only meant for dev environment purposes"
     echo "                               - Removes all prompting from the user"
+    echo "    -t <seconds>             TTL to provide to any certificate created (Unit: seconds)"
 }
 
 function _validate_optarg()
 {
     if [[ $1 == -* ]];then
-        echo -e "Missing an argument\n"
+        echo -e "Missing an argument for $_opt\n"
         exit 1
     fi
 }
@@ -168,27 +173,59 @@ function validate_arguments()
         echo -e "Intermediate name cannot contain a period (.)\n"
         return 1
     fi
+    if [[ ! -z $_time_to_live ]]; then
+        if [[ ! $_time_to_live =~ ^[0-9]+$ ]]; then
+            echo -e "Seconds provided via -t must be whole numbers.\n"
+            return 1
+        fi
+        _os=$($_os_info)
+        _epoch_end_of_life=$(( $(date +%s) + $_time_to_live ))
+        if [[ $_os -eq "Mac" ]]; then
+            _time_to_live=$(TZ=GMT date -r $_epoch_end_of_life '+%Y%m%d%H%M%SZ')
+        elif [[ $_os -eq "Linux" ]]; then
+            _time_to_live=$(TZ=GMT date -d@$_epoch_end_of_life '+%Y%m%d%H%M%SZ')
+        else
+            echo "$_os is an supported OS type for certificate_authority, -t functionality is unavailable."
+            return 1
+        fi
+    fi
     return 0
 }
 
-function maybe_log() {
+function maybe_log()
+{
     if [[ ! -z $_verbose ]]; then
         log "$1"
     fi
 }
 
-function log() {
+function log()
+{
     DT="$(date -u '+%H:%M:%S')"
     echo "$DT [$_script_name] - $1"
 }
 
-function _execute_command() {
+function _execute_command()
+{
     maybe_log "COMMAND: $1"
     eval "$1"
     if [[ $? -ne 0 ]]; then
         log "ERROR: $2"
         exit 1
     fi
+}
+
+function _os_info()
+{
+    local unameOut="$(uname -s)"
+    case "${unameOut}" in
+        Linux*)     machine=Linux;;
+        Darwin*)    machine=Mac;;
+        CYGWIN*)    machine=Cygwin;;
+        MINGW*)     machine=MinGw;;
+        *)          machine="UNKNOWN:${unameOut}"
+    esac
+    echo ${machine}
 }
 
 function print_intermediates()
@@ -349,6 +386,13 @@ function _generate_rootca_cert()
     fi
     local _openssl_pass_arg="-batch -passin pass:$_password"
 
+    if [[ -z $_time_to_live ]]; then
+      _ttl="-days $_root_days_to_live"
+    else
+      _ttl="-enddate $_time_to_live"
+    fi
+    maybe_log "Using TTL: $_ttl"
+
     _cmd="openssl req -config $ROOTCA_CNF_FILE -key $_root_private_key \
         -new -x509 -days $_root_days_to_live -sha512 -extensions $_root_extension \
         -out $_root_public_cert $_openssl_pass_arg"
@@ -417,8 +461,15 @@ function _sign_intermediate_csr()
     fi
     local _openssl_pass_arg="-batch -passin pass:$_password"
 
+    if [[ -z $_time_to_live ]]; then
+      _ttl="-days $_intermediate_days_to_live"
+    else
+      _ttl="-enddate $_time_to_live"
+    fi
+    maybe_log "Using TTL: $_ttl"
+
     _cmd="openssl ca -config $ROOTCA_CNF_FILE -extensions $_intermediate_extension \
-        -days $_intermediate_days_to_live -notext -md sha512 \
+        $_ttl -notext -md sha512 \
         -in $_intermediate_csr_file -out $_intermediate_signed_cert $_openssl_pass_arg 2>/dev/null"
     _execute_command "$_cmd" "Failed to sign intermediate certificate using $_intermediate_csr_file"
     chmod 444 $_intermediate_signed_cert
@@ -483,9 +534,16 @@ function _sign_leaf_csr()
     fi
     local _openssl_pass_arg="-batch -passin pass:$_password"
 
+    if [[ -z $_time_to_live ]]; then
+      _ttl="-days $_leaf_days_to_live"
+    else
+      _ttl="-enddate $_time_to_live"
+    fi
+    maybe_log "Using TTL: $_ttl"
+
     _cmd="openssl ca -config $INTERMEDIATE_CNF_FILE -extensions $_leaf_certificate_type \
-        -days $_leaf_days_to_live -notext -md sha512 \
-        -in $_leaf_csr_file -out $_leaf_signed_cert $_openssl_pass_arg 2>/dev/null"
+        $_ttl -notext -md sha512 \
+        -in $_leaf_csr_file -out $_leaf_signed_cert $_openssl_pass_arg 2> /dev/null"
     _execute_command "$_cmd" "Failed to sign leaf certificate using $_leaf_csr_file"
     chmod 444 $_leaf_signed_cert
 }
