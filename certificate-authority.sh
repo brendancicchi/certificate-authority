@@ -54,31 +54,8 @@ function parse_arguments()
         echo -e "No arguments were passed\n"
         _print_usage
     fi
-    while getopts ":hlrvi:c:s:e:x:z:p:t:" _opt; do
+    while getopts ":c:e:hi:lp:rs:t:vx:z:" _opt; do
         case $_opt in
-            h )
-                _print_usage
-                exit 0
-                ;;
-            l )
-                _flag_list_certs=true
-                ;;
-            r)
-                _flag_rootca=true
-                ;;
-            v)
-                _verbose=true
-                ;;
-            i)
-                _validate_optarg $OPTARG
-                _store_intermediate_name="$OPTARG"
-                ;;
-            s)
-                _validate_optarg $OPTARG
-                _store_leaf_certificate_name="$OPTARG"
-                _leaf_certificate_type="server_cert"
-                _flag_server_certificate=true
-                ;;
             c)
                 _validate_optarg $OPTARG
                 _store_leaf_certificate_name="$OPTARG"
@@ -89,6 +66,37 @@ function parse_arguments()
                 _validate_optarg $OPTARG
                 _store_san_extensions="$OPTARG"
                 ;;
+            h )
+                _print_usage
+                exit 0
+                ;;
+            i)
+                _validate_optarg $OPTARG
+                _store_intermediate_name="$OPTARG"
+                ;;
+            l )
+                _flag_list_certs=true
+                ;;
+            p)
+                _validate_optarg $OPTARG
+                _store_password="$OPTARG"
+                ;;
+            r)
+                _flag_rootca=true
+                ;;
+            s)
+                _validate_optarg $OPTARG
+                _store_leaf_certificate_name="$OPTARG"
+                _leaf_certificate_type="server_cert"
+                _flag_server_certificate=true
+                ;;
+            t)
+                _validate_optarg $OPTARG
+                _time_to_live="$OPTARG"
+                ;;
+            v)
+                _verbose=true
+                ;;
             x)
                 _validate_optarg $OPTARG
                 _store_revoke_name="$OPTARG"
@@ -96,14 +104,6 @@ function parse_arguments()
             z)
                 _validate_optarg $OPTARG
                 _store_zip_name="$OPTARG.tar"
-                ;;
-            p)
-                _validate_optarg $OPTARG
-                _store_password="$OPTARG"
-                ;;
-            t)
-                _validate_optarg $OPTARG
-                _time_to_live="$OPTARG"
                 ;;
             \?)
                 echo -e "Invalid option: -$OPTARG\n"
@@ -122,29 +122,29 @@ function parse_arguments()
 function _print_usage()
 {
     echo "Usage:"
-    echo "    -h                       Display this help message."
-    echo "    -l                       List created intermediates"
-    echo "                               - Use with -i <intermediate> to show leaf certificates"
-    echo "    -r                       Create the rootca key and certificate"
-    echo "    -v                       Generate verbose output"
-    echo "    -i <intermediate_name>   Create or use intermediate with given name"
-    echo "                               - The name should be the same as the CN"
-    echo "    -s <server_cert_name>    Create a server certificate with given name"
-    echo "                               - Requires -i <intermediate_name> to sign"
     echo "    -c <client_cert_name>    Create a client certificate with given name"
     echo "                               - Requires -i <intermediate_name> to sign"
     echo "    -e <IP:ip,DNS:host,...>  SAN list to be used for server or client certificate"
     echo "                               - Requires -s <server_cert_name> or -c <client_cert_name>"
+    echo "    -h                       Display this help message."
+    echo "    -i <intermediate_name>   Create or use intermediate with given name"
+    echo "                               - The name should be the same as the CN"
+    echo "    -l                       List created intermediates"
+    echo "                               - Use with -i <intermediate> to show leaf certificates"
+    echo "    -p <password>            Password to be applied to ALL openssl and keytool commands"
+    echo "                               - This is not secure and only meant for dev environment purposes"
+    echo "                               - Removes all prompting from the user"
+    echo "    -r                       Create the rootca key and certificate"
+    echo "    -s <server_cert_name>    Create a server certificate with given name"
+    echo "                               - Requires -i <intermediate_name> to sign"
+    echo "    -t <seconds>             TTL to provide to any certificate created (Unit: seconds)"
+    echo "    -v                       Generate verbose output"
     echo "    -x <certificate_name>    Revoke the named certificate"
     echo "                               - Use with -i <intermediate> to specify a leaf certificate"
     echo "                               - Otherwise assumes intermediate certificate"
     echo "    -z <zip_name>            Zip up the relevant certificates, keys, and stores"
     echo "                               - Use with -i <intermediate> to only zip the public chain and stores"
     echo "                               - Use with -c or -s to include the keys and keystores"
-    echo "    -p <password>            Password to be applied to ALL openssl and keytool commands"
-    echo "                               - This is not secure and only meant for dev environment purposes"
-    echo "                               - Removes all prompting from the user"
-    echo "    -t <seconds>             TTL to provide to any certificate created (Unit: seconds)"
 }
 
 function _validate_optarg()
