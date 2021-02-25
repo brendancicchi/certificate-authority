@@ -48,3 +48,4 @@ The **Solution** links contain spoilers. Please attempt to correct the scenario 
 * Scenario 2 - `./run-scenario.sh -s 2` -> [Solution](scenarios/scenario2/SOLUTION.md)
 * Scenario 3 - `./run-scenario.sh -s 3` -> [Solution](scenarios/scenario3/SOLUTION.md)
 * Scenario 4 - `./run-scenario.sh -s 4` -> [Solution](scenarios/scenario4/SOLUTION.md)
+* Scenario 5 - `./run-scenario.sh -s 5` -> [Solution](scenarios/scenario5/SOLUTION.md)
