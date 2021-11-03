@@ -9,7 +9,7 @@
 
 ##### Begin Configurations #####
 [[ -z $PROVIDER ]] && PROVIDER="nebula"
-[[ -z $CTOOL ]] && CTOOL="PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}"
+[[ -z $CTOOL ]] && CTOOL="PYENV_VERSION=ctool ctool --provider=${PROVIDER}"
 [[ -z $PASSWORD ]] && PASSWORD="cassandra"
 ##### End Configurations #####
 
@@ -215,7 +215,7 @@ function _configure_dse_nodes()
 function _configure_cqlsh()
 {
   log "Configuring cqlshrc for automaton..."
-  _cqlshrc="[ssl]\nvalidate = true\ncertfile=/etc/dse/security/ca.cert.pem"
+  _cqlshrc="[ssl]\nvalidate = true\nversion = SSLv23\ncertfile=/etc/dse/security/ca.cert.pem"
   if [ ! -z $_require_client_auth ]; then
     _generate_cqlsh_certificates
     _cmd="$CTOOL run $_cluster_name all \"mkdir -p /home/automaton/.cassandra/certs/ && \
