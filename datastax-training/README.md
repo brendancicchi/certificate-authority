@@ -12,7 +12,7 @@ Configure the _CAPS-LOCKED_ variables in the configuration block, at the top of 
 ```
 ##### Begin Configurations #####
 export PROVIDER="nebula"
-export CTOOL="PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}"
+export CTOOL="PYENV_VERSION=ctool ctool --provider=${PROVIDER}"
 export PASSWORD="cassandra"
 export TMP="/tmp"
 CLUSTER_NAME="datastax-ssl-training"
