@@ -11,7 +11,7 @@ git clone https://github.com/brendancicchi/certificate-authority.git
 Copy the _resources/*.cnf files_ to a desired location in your file system. For example:
 
 ```bash
-mkdir -p ~/.ssl/cnf_files
+mkdir -p ~/.ssl/{cnf_files,ca}
 cp resources/*.cnf ~/.ssl/cnf_files
 ```
 
