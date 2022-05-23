@@ -115,7 +115,7 @@ function source_leaf_vars() {
 # So as a workaround, set them manually in the CNF files
 function push_ssl_rootca_cnf_paths()
 {
-    sed -i .orig -e "s,\(^certs *=\).*,\1 $_root_public_certs_dir," \
+    sed -i.orig -e "s,\(^certs *=\).*,\1 $_root_public_certs_dir," \
         -e "s,\(^crl_dir *=\).*,\1 $_root_crl_dir," \
         -e "s,\(^new_certs_dir *=\).*,\1 $_root_new_certs_dir," \
         -e "s,\(^database *=\).*,\1 $_root_index_file," \
@@ -130,7 +130,7 @@ function push_ssl_rootca_cnf_paths()
 
 function push_ssl_intermediate_cnf_paths()
 {
-    sed -i .orig -e "s,\(^certs *=\).*,\1 $_intermediate_public_certs_dir," \
+    sed -i.orig -e "s,\(^certs *=\).*,\1 $_intermediate_public_certs_dir," \
         -e "s,\(^crl_dir *=\).*,\1 $_intermediate_crl_dir," \
         -e "s,\(^new_certs_dir *=\).*,\1 $_intermediate_new_certs_dir," \
         -e "s,\(^database *=\).*,\1 $_intermediate_index_file," \

@@ -69,7 +69,7 @@ function setup_scenario {
       _java_security=\\\$(dirname \\\$(ps -ef | grep DseModule | grep -v grep | awk '{print \\\$8}'))/../lib/security/java.security; \
       echo \\\"Path: \\\$_java_security\\\"; \
       egrep \\\"^jdk\.tls\.disabledAlgorithms=\\\" \\\$_java_security | grep -v \\\"SHA1, \\\" \
-      && sudo sed -i '/jdk.tls.disabledAlgorithms=/ s/\(.*=\)\(.*\)/\1SHA1, \2/' \\\$_java_security \" > /dev/null"
+      && sudo sed -i.orig '/jdk.tls.disabledAlgorithms=/ s/\(.*=\)\(.*\)/\1SHA1, \2/' \\\$_java_security \" > /dev/null"
     log "$_scenario was successfully configured"
 }
 

@@ -436,7 +436,7 @@ function _generate_intermediate_csr()
         _password=$_store_password
     fi
     local _openssl_pass_arg="-batch -passin pass:$_password"
-    sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_intermediate_name," $INTERMEDIATE_CNF_FILE
+    sed -i.orig -e "s,\(^commonName_default *=\).*,\1 $_store_intermediate_name," $INTERMEDIATE_CNF_FILE
     
     _cmd="openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
         -key $_intermediate_private_key -out $_intermediate_csr_file $_openssl_pass_arg 2>/dev/null"
@@ -505,9 +505,9 @@ function _generate_leaf_csr()
         _password=$_store_password
     fi
     local _openssl_pass_arg="-batch -passin pass:$_password"
-    sed -i .orig -e "s%\(^subjectAltName *=\).*%\1 $_store_san_extensions%" $INTERMEDIATE_CNF_FILE
+    sed -i.orig -e "s%\(^subjectAltName *=\).*%\1 $_store_san_extensions%" $INTERMEDIATE_CNF_FILE
     [[ ! -z $_store_san_extensions ]] && _request_san_extension="-reqexts SAN"
-    sed -i .orig -e "s,\(^commonName_default *=\).*,\1 $_store_leaf_certificate_name," $INTERMEDIATE_CNF_FILE
+    sed -i.orig -e "s,\(^commonName_default *=\).*,\1 $_store_leaf_certificate_name," $INTERMEDIATE_CNF_FILE
 
     _cmd="openssl req -config $INTERMEDIATE_CNF_FILE -new -sha512 \
         -key $_leaf_private_key -out $_leaf_csr_file \
