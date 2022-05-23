@@ -9,7 +9,7 @@
 
 ##### Begin Configurations #####
 export PROVIDER="nebula"
-export CTOOL="PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}"
+export CTOOL="PYENV_VERSION=ctool ctool --provider=${PROVIDER}"
 export PASSWORD="cassandra"
 export TMP="/tmp"
 export CLUSTER_NAME="datastax-ssl-training"
