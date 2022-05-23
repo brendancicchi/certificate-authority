@@ -6,7 +6,7 @@
 Configure the _CAPS-LOCKED_ variables at the top of the of the script for **ctool** customizations and configuring the path to **certificate-authority**. The default password to be applied wherever necessary can also be changed.
 ```bash
 PROVIDER="nebula"
-CTOOL="PYENV_VERSION=2.7.17/envs/ctool ctool --provider=${PROVIDER}"
+CTOOL="PYENV_VERSION=ctool ctool --provider=${PROVIDER}"
 CA="$(dirname $0)/../certificate-authority.sh"
 PASSWORD="cassandra"
 ```
